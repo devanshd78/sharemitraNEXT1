@@ -48,7 +48,7 @@ const Profile: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
-    // Allow only numbers for phonenumber
+    // Allow only numbers for phone number
     const processedValue = name === "phone" ? value.replace(/\D/g, "") : value;
 
     setProfile((prev) => ({ ...prev, [name]: processedValue }));
@@ -98,7 +98,7 @@ const Profile: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-green-50 dark:bg-zinc-950 py-24 px-4">
+    <div className="min-h-screen bg-green-50 dark:bg-zinc-950 p-6">
       <div className="max-w-xl mx-auto bg-white dark:bg-zinc-900 rounded-3xl shadow-lg border border-green-200 dark:border-zinc-700 p-8 md:p-10">
         <h2 className="text-4xl font-bold text-center mb-10 text-green-800 dark:text-green-200">
           Profile Settings

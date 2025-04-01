@@ -21,7 +21,7 @@ const Navbar: React.FC = () => {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    if (pathname === "/login") return;
+    if (pathname === "/login" || pathname.startsWith("/advertiser") || pathname.startsWith("/my-account")) return;
 
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -41,9 +41,7 @@ const Navbar: React.FC = () => {
   }, [pathname]);
 
   // Conditionally return null AFTER all hooks have been called
-  if (pathname === "/login") {
-    return null;
-  }
+  if (pathname === "/login" || pathname.startsWith("/advertiser") || pathname.startsWith("/my-account")) return null;
 
   // Logout handler
   const handleLogout = () => {
@@ -135,70 +133,12 @@ const Navbar: React.FC = () => {
                       <button
                         onClick={() => {
                           setDropdownOpen(false);
-                          router.push("/profile");
+                          router.push("/my-account/profile");
                         }}
                         className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
                       >
-                        Profile
+                        My Account
                       </button>
-                    </li>
-                    <li>
-                      <button
-                        onClick={() => {
-                          setDropdownOpen(false);
-                          router.push("/payment-details");
-                        }}
-                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                      >
-                        Payment Details
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        onClick={() => {
-                          setDropdownOpen(false);
-                          router.push("/wallet");
-                        }}
-                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                      >
-                        Wallet/ Withdraw
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        onClick={() => {
-                          setDropdownOpen(false);
-                          router.push("/task-status");
-                        }}
-                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                      >
-                        Task Status
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        onClick={() => {
-                          setDropdownOpen(false);
-                          router.push("/payment-status");
-                        }}
-                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                      >
-                        Payment Status
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        onClick={() => {
-                          setDropdownOpen(false);
-                          router.push("/refer-earn");
-                        }}
-                        className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
-                      >
-                        Refer & Earn
-                      </button>
-                    </li>
-                    <li>
-                      <hr className="my-1 border-gray-300" />
                     </li>
                     <li>
                       <button

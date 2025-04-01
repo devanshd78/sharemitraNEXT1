@@ -1,19 +1,19 @@
-"use client";
+"use client"
 
 import React, { useState, useEffect, FormEvent, ChangeEvent } from "react";
 import Swal from "sweetalert2";
-import ReCAPTCHA from "react-google-recaptcha";
-import { FaChevronDown, FaChevronUp, FaEdit } from "react-icons/fa";
+import { FaChevronDown, FaChevronUp, FaEdit, FaTrash } from "react-icons/fa";
+import PaymentModal from "./paymentModal"; // Adjust the import path as necessary
 
+// Define your PaymentMethod interface and any other types here
 interface PaymentMethod {
   _id: string;
   userId: string;
-  paymentMethod: number;
+  paymentMethod: number; // 1 for bank, other for UPI
   accountHolder?: string;
   accountNumber?: string;
   ifsc?: string;
   bankName?: string;
-  ifscDetails?: any;
   upiId?: string;
   created_at: string;
 }
@@ -32,14 +32,15 @@ const PaymentPage: React.FC = () => {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [expandedPayment, setExpandedPayment] = useState<string | null>(null);
   const [editingPayment, setEditingPayment] = useState<PaymentMethod | null>(null);
+  const [showModal, setShowModal] = useState<boolean>(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       const user = JSON.parse(storedUser);
-      if (user._id) {
-        setUserId(user._id);
-        fetchPaymentMethods(user._id);
+      if (user.userId) {
+        setUserId(user.userId);
+        fetchPaymentMethods(user.userId);
       }
     }
   }, []);
@@ -52,7 +53,7 @@ const PaymentPage: React.FC = () => {
         setPaymentMethods(data.payments);
       } else {
         setPaymentMethods([]);
-      }``
+      }
     } catch (err) {
       console.error("Error fetching payment methods:", err);
     }
@@ -103,7 +104,7 @@ const PaymentPage: React.FC = () => {
       setPaymentMethod("upi");
       setUpiDetails({ upiId: payment.upiId || "" });
     }
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    setShowModal(true);
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -124,9 +125,10 @@ const PaymentPage: React.FC = () => {
       }
     }
 
-    const payload = paymentMethod === "bank"
-      ? { userId, paymentMethod: "bank", ...bankDetails }
-      : { userId, paymentMethod: "upi", upiId: upiDetails.upiId };
+    const payload =
+      paymentMethod === "bank"
+        ? { userId, paymentMethod: "bank", ...bankDetails }
+        : { userId, paymentMethod: "upi", upiId: upiDetails.upiId };
 
     try {
       const res = await fetch("http://127.0.0.1:5000/payment/payment-details", {
@@ -142,6 +144,7 @@ const PaymentPage: React.FC = () => {
         setBankDetails({ accountHolder: "", accountNumber: "", ifsc: "", bankName: "" });
         setUpiDetails({ upiId: "" });
         fetchPaymentMethods(userId);
+        setShowModal(false);
       } else {
         Swal.fire("Error", data.msg, "error");
       }
@@ -150,11 +153,55 @@ const PaymentPage: React.FC = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen flex flex-col bg-green-50 dark:bg-zinc-950 p-4 mt-20 text-gray-800 dark:text-gray-100">
-      <div className="w-full max-w-4xl mx-auto mb-6">
-        <h2 className="text-3xl font-bold mb-4 text-green-900 dark:text-green-200">My Payment Methods</h2>
+  const handleDeletePayment = async (paymentId: string) => {
+    const confirmDelete = await Swal.fire({
+      title: "Are you sure?",
+      text: "You won't be able to recover this payment method!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete it!",
+    });
+  
+    if (confirmDelete.isConfirmed) {
+      try {
+        const res = await fetch("http://127.0.0.1:5000/payment/delete", {
+          method: "POST", // Using POST instead of DELETE
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paymentId }), // Send paymentId in the request body
+        });
+  
+        const data = await res.json();
+  
+        if (res.ok) {
+          Swal.fire("Deleted!", data.msg, "success");
+          fetchPaymentMethods(userId); // Refresh payment methods
+        } else {
+          Swal.fire("Error", data.msg, "error");
+        }
+      } catch (error) {
+        Swal.fire("Error", "Failed to delete the payment method.", "error");
+      }
+    }
+  };  
 
+  return (
+    <div className="min-h-screen flex flex-col bg-green-50 dark:bg-zinc-950 p-6 text-gray-800 dark:text-gray-100">
+      {/* Payment Methods Table */}
+      <div className="w-full max-w-4xl mx-auto mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-3xl font-bold text-green-900 dark:text-green-200">My Payment Methods</h2>
+          <button
+            onClick={() => {
+              setEditingPayment(null);
+              setShowModal(true);
+            }}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+          >
+            Add Payment Method
+          </button>
+        </div>
         {paymentMethods.length === 0 ? (
           <p className="text-green-700 dark:text-green-300">No payment methods added yet.</p>
         ) : (
@@ -165,9 +212,13 @@ const PaymentPage: React.FC = () => {
                   <div className="space-y-1">
                     <h3 className="text-lg font-semibold text-green-900 dark:text-green-200">
                       {payment.paymentMethod === 1 ? (
-                        <span className="bg-green-100 dark:bg-green-700 text-green-700 dark:text-green-100 text-xs px-2 py-0.5 rounded">Bank</span>
+                        <span className="bg-green-100 dark:bg-green-700 text-green-700 dark:text-green-100 text-xs px-2 py-0.5 rounded">
+                          Bank
+                        </span>
                       ) : (
-                        <span className="bg-green-200 dark:bg-green-700 text-green-800 dark:text-green-100 text-xs px-2 py-0.5 rounded">UPI</span>
+                        <span className="bg-green-200 dark:bg-green-700 text-green-800 dark:text-green-100 text-xs px-2 py-0.5 rounded">
+                          UPI
+                        </span>
                       )}
                     </h3>
                     <p className="text-sm text-green-700 dark:text-green-300">
@@ -175,11 +226,25 @@ const PaymentPage: React.FC = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => setExpandedPayment(expandedPayment === payment._id ? null : payment._id)} className="text-green-600 dark:text-green-300 hover:text-green-800">
+                    <button
+                      onClick={() => setExpandedPayment(expandedPayment === payment._id ? null : payment._id)}
+                      className="text-green-600 dark:text-green-300 hover:text-green-800"
+                    >
                       {expandedPayment === payment._id ? <FaChevronUp /> : <FaChevronDown />}
                     </button>
-                    <button onClick={() => handleEditPayment(payment)} className="text-green-600 dark:text-green-300 hover:text-green-800">
+
+                    <button
+                      onClick={() => handleEditPayment(payment)}
+                      className="text-green-600 dark:text-green-300 hover:text-green-800"
+                    >
                       <FaEdit />
+                    </button>
+
+                    <button
+                      onClick={() => handleDeletePayment(payment._id)}
+                      className="text-red-600 dark:text-red-300 hover:text-red-800"
+                    >
+                      <FaTrash />
                     </button>
                   </div>
                 </div>
@@ -188,13 +253,23 @@ const PaymentPage: React.FC = () => {
                   <div className="mt-4 pt-3 text-sm text-green-800 dark:text-green-200 border-t border-green-200 dark:border-green-600 space-y-1">
                     {payment.paymentMethod === 1 ? (
                       <>
-                        <p><strong>Account Holder:</strong> {payment.accountHolder}</p>
-                        <p><strong>Account Number:</strong> {payment.accountNumber}</p>
-                        <p><strong>IFSC:</strong> {payment.ifsc}</p>
-                        <p><strong>Bank Name:</strong> {payment.bankName}</p>
+                        <p>
+                          <strong>Account Holder:</strong> {payment.accountHolder}
+                        </p>
+                        <p>
+                          <strong>Account Number:</strong> {payment.accountNumber}
+                        </p>
+                        <p>
+                          <strong>IFSC:</strong> {payment.ifsc}
+                        </p>
+                        <p>
+                          <strong>Bank Name:</strong> {payment.bankName}
+                        </p>
                       </>
                     ) : (
-                      <p><strong>UPI ID:</strong> {payment.upiId}</p>
+                      <p>
+                        <strong>UPI ID:</strong> {payment.upiId}
+                      </p>
                     )}
                   </div>
                 )}
@@ -204,85 +279,22 @@ const PaymentPage: React.FC = () => {
         )}
       </div>
 
-      {/* Payment Form */}
-      <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded shadow p-6 mx-auto border border-green-200 dark:border-green-700">
-        <h2 className="text-2xl font-bold mb-4 text-green-900 dark:text-green-200">
-          {editingPayment ? "Edit Payment Details" : "Add Payment Details"}
-        </h2>
-
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-lg font-medium mb-2 text-green-800 dark:text-green-200">
-              Select Payment Method:
-            </label>
-            <div className="flex items-center gap-4 text-green-700 dark:text-green-300">
-              <label className="flex items-center gap-2">
-                <input type="radio" name="paymentMethod" value="bank" checked={paymentMethod === "bank"} onChange={handlePaymentMethodChange} />
-                Bank
-              </label>
-              <label className="flex items-center gap-2">
-                <input type="radio" name="paymentMethod" value="upi" checked={paymentMethod === "upi"} onChange={handlePaymentMethodChange} />
-                UPI
-              </label>
-            </div>
-          </div>
-
-          {paymentMethod === "bank" ? (
-            <>
-              {["accountHolder", "accountNumber", "ifsc", "bankName"].map((field) => (
-                <div key={field} className="mb-4">
-                  <label htmlFor={field} className="block text-sm font-medium mb-1 text-green-700 dark:text-green-300">
-                    {field === "accountHolder" ? "Account Holder Name" :
-                     field === "accountNumber" ? "Account Number" :
-                     field === "ifsc" ? "IFSC Code" : "Bank Name"}
-                  </label>
-                  <input
-                    type="text"
-                    id={field}
-                    name={field}
-                    value={(bankDetails as any)[field]}
-                    onChange={handleBankInputChange}
-                    onBlur={field === "ifsc" ? handleIfscBlur : undefined}
-                    className={`w-full border px-3 py-2 rounded ${field === "bankName" ? "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100" : "border-green-300"}`}
-                    required={field !== "bankName"}
-                    disabled={field === "bankName"}
-                  />
-                </div>
-              ))}
-            </>
-          ) : (
-            <div className="mb-4">
-              <label htmlFor="upiId" className="block text-sm font-medium mb-1 text-green-700 dark:text-green-300">UPI ID</label>
-              <input
-                type="text"
-                id="upiId"
-                name="upiId"
-                value={upiDetails.upiId}
-                onChange={handleUpiInputChange}
-                className="w-full border border-green-300 rounded px-3 py-2"
-                required
-              />
-            </div>
-          )}
-
-          <div className="flex justify-center mb-4">
-            <div className="transform scale-90 md:scale-100 origin-center">
-              <ReCAPTCHA
-                sitekey={process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY!}
-                onChange={(token) => setRecaptchaToken(token)}
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
-            disabled={!recaptchaToken}
-          >
-            {editingPayment ? "Update Payment Details" : "Submit Payment Details"}
-          </button>
-        </form>
-      </div>
+      {/* Payment Modal */}
+      <PaymentModal
+        showModal={showModal}
+        editingPayment={editingPayment}
+        paymentMethod={paymentMethod}
+        bankDetails={bankDetails}
+        upiDetails={upiDetails}
+        recaptchaToken={recaptchaToken}
+        onPaymentMethodChange={handlePaymentMethodChange}
+        onBankInputChange={handleBankInputChange}
+        onUpiInputChange={handleUpiInputChange}
+        onIfscBlur={handleIfscBlur}
+        onRecaptchaChange={(token) => setRecaptchaToken(token)}
+        onSubmit={handleSubmit}
+        onCancel={() => setShowModal(false)}
+      />
     </div>
   );
 };

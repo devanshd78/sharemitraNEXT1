@@ -49,7 +49,7 @@ const WalletPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-green-50 dark:bg-zinc-950 py-24 px-6">
+    <div className="min-h-screen bg-green-50 dark:bg-zinc-950 p-6">
       <div className="max-w-xl mx-auto bg-white dark:bg-zinc-900 rounded-3xl shadow-lg p-8 border border-green-200 dark:border-green-700">
         <h2 className="text-4xl font-bold text-center text-green-800 dark:text-green-100 mb-6">
           Wallet

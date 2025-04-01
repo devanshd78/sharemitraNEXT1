@@ -147,17 +147,17 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
     const data = isLogin ? loginData : signupData;
 
     // reCAPTCHA
-    await executeRecaptcha();
-    if (!recaptchaToken) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "Could not validate reCAPTCHA. Please try again.",
-        timer: 1500,
-        showConfirmButton: false,
-      });
-      return;
-    }
+    // await executeRecaptcha();
+    // if (!recaptchaToken) {
+    //   Swal.fire({
+    //     icon: "error",
+    //     title: "Error",
+    //     text: "Could not validate reCAPTCHA. Please try again.",
+    //     timer: 1500,
+    //     showConfirmButton: false,
+    //   });
+    //   return;
+    // }
 
     // Validate
     const valid = isLogin ? validateLogin() : validateSignup();
@@ -168,14 +168,12 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       const response = await axios.post(url, data, {
         headers: { "Content-Type": "application/json" },
       });
-      console.log("Success:", response.data);
 
       if (isLogin) {
-        // Store user in localStorage, close modal, route to /home
         localStorage.setItem("user", JSON.stringify(response.data.user));
         localStorage.setItem("isLoggedIn", "true");
-        onClose();        // Close the modal
-        router.push("/home");
+        onClose();
+        router.refresh(); // Force refresh the page
       } else {
         // Signed up, show success, switch to login mode
         Swal.fire({
@@ -516,11 +514,11 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                 )}
 
                 {/* Invisible reCAPTCHA v2 */}
-                <ReCAPTCHA
+                {/* <ReCAPTCHA
                   ref={recaptchaRef}
                   sitekey={process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY!}
                   size="invisible"
-                />
+                /> */}
 
                 {/* Submit Button */}
                 <button

@@ -42,7 +42,7 @@ const ReferEarn: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-green-50 dark:bg-zinc-900 py-24 px-4 text-gray-800 dark:text-white">
+    <div className="min-h-screen bg-green-50 dark:bg-zinc-900 p-6 text-gray-800 dark:text-white">
       <div className="max-w-2xl mx-auto bg-white dark:bg-zinc-800 rounded-3xl shadow-lg p-8 md:p-10 border border-green-200 dark:border-green-700">
         <h2 className="text-4xl font-extrabold text-center text-green-900 dark:text-green-100 mb-6">
           Refer & Earn 💸
