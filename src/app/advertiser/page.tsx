@@ -14,7 +14,8 @@ const AdminDashboard = () => {
 //     }
 //   }, []);
 
-  return <div className="py-24">Admin Content Here</div>;
+  return <div>Advertiser Content Here</div>;
 };
 
+AdminDashboard.noNavbar = true;
 export default AdminDashboard

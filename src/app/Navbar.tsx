@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
+import { useModalStore } from "./stores/modalStore";
 
 interface User {
   name: string;
@@ -15,11 +16,11 @@ const Navbar: React.FC = () => {
   // State Hooks
   const [user, setUser] = useState<User | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const { openLoginModal } = useModalStore();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    if (pathname === "/advertiser") return;
     if (pathname === "/login") return;
 
     const storedUser = localStorage.getItem("user");
@@ -40,14 +41,9 @@ const Navbar: React.FC = () => {
   }, [pathname]);
 
   // Conditionally return null AFTER all hooks have been called
-  if (pathname === "/advertiser") {
-    return null;
-  }
   if (pathname === "/login") {
     return null;
   }
-
-
 
   // Logout handler
   const handleLogout = () => {
@@ -222,7 +218,7 @@ const Navbar: React.FC = () => {
           ) : (
             <button
               className="bg-green-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-green-700 cursor-pointer"
-              onClick={() => router.push("/login")}
+              onClick={openLoginModal}
             >
               Sign Up / Log In
             </button>

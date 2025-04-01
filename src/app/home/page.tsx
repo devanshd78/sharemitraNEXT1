@@ -11,6 +11,8 @@ import {
   Upload,
   Gift,
 } from "lucide-react";
+import { useModalStore } from "../stores/modalStore";
+import LoginModal from "./login";
 
 interface Task {
   taskId: string;         // 👈 Add this
@@ -60,7 +62,7 @@ const HomePage: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-
+  const { showLoginModal, closeLoginModal } = useModalStore();
   const heading = "ShareMitra...";
   const [typedText, setTypedText] = useState("");
   const [charIndex, setCharIndex] = useState(0);
@@ -330,6 +332,7 @@ const HomePage: React.FC = () => {
           </p>
         </div>
       </footer>
+      {showLoginModal && <LoginModal onClose={closeLoginModal} />}
     </div>
   );
 };
