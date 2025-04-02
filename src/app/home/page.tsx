@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useModalStore } from "../stores/modalStore";
 import LoginModal from "./login";
+import TaskUploadModal from "./screenshotModal";
 
 interface Task {
   taskId: string;         // 👈 Add this
@@ -66,6 +67,8 @@ const HomePage: React.FC = () => {
   const heading = "ShareMitra...";
   const [typedText, setTypedText] = useState("");
   const [charIndex, setCharIndex] = useState(0);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     const user = localStorage.getItem("user");
@@ -129,8 +132,15 @@ const HomePage: React.FC = () => {
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
   };
 
-  const handleNextStepForTask = (taskId: string) => {
-    router.push(`/home/taskupload?taskId=${taskId}`);
+  const handleOpenUploadModal = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    setShowModal(true);
+  };
+
+  // Close the modal
+  const handleCloseUploadModal = () => {
+    setShowModal(false);
+    setSelectedTaskId(null);
   };
 
   const renderTaskCard = (task: Task) => (
@@ -155,38 +165,53 @@ const HomePage: React.FC = () => {
         {task.message}
       </a>
 
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4 mb-6">
         <button
           className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-md font-semibold transition"
-          onClick={() => handleCopyMessage(`${task.description}\n${task.message}`)}
+          onClick={() =>
+            handleCopyMessage(`${task.description}\n${task.message}`)
+          }
         >
           Copy Message
         </button>
 
         <button
           className="bg-green-700 hover:bg-green-800 text-white px-5 py-2.5 rounded-md font-semibold transition"
-          onClick={() => handleSendWhatsApp(`${task.description}\n${task.message}`)}
+          onClick={() =>
+            handleSendWhatsApp(`${task.description}\n${task.message}`)
+          }
         >
           Broadcast on WhatsApp
         </button>
 
         <button
           className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-md font-semibold transition"
-          onClick={() => handleSendWhatsApp(`${task.description}\n${task.message}`)}
+          onClick={() =>
+            handleSendWhatsApp(`${task.description}\n${task.message}`)
+          }
         >
           Share on WhatsApp
         </button>
+      </div>
 
+      <hr className="my-4 border-gray-300 dark:border-gray-600" />
+
+      <div className="flex">
         <button
-          className="bg-gray-700 hover:bg-gray-800 text-white px-5 py-2.5 rounded-md font-semibold transition"
-          onClick={() => handleNextStepForTask(task.taskId)}
+          className="bg-gray-700 hover:bg-gray-800 text-white px-5 py-2.5 rounded-md font-semibold transition w-full"
+          onClick={() => handleOpenUploadModal(task.taskId)}
         >
-          Proceed to Task
+          Upload Screenshots
         </button>
       </div>
+      {showModal && (
+        <TaskUploadModal
+          taskId={selectedTaskId}
+          onClose={handleCloseUploadModal}
+        />
+      )}
     </div>
   );
-
 
   return (
     <div className="min-h-screen bg-green-50 dark:bg-zinc-950 text-gray-800 dark:text-white font-[Poppins]">
@@ -203,21 +228,35 @@ const HomePage: React.FC = () => {
 
       {/* About Section */}
       <section id="about" className="w-full bg-white dark:bg-zinc-900 py-16 px-6">
-        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-center text-green-800 dark:text-green-100 mb-6">
+        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-center text-green-800 dark:text-green-100 mb-10">
           About ShareMitra
         </h2>
-        <p className="text-base sm:text-lg lg:text-xl text-center text-gray-700 dark:text-gray-300 mb-10 max-w-3xl mx-auto">
-          ShareMitra is your platform to earn money by completing simple online tasks and sharing with others via WhatsApp. Watch this video to get started!
-        </p>
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+          {/* Dialog Card with 100-word Description */}
+          <div className="min-h-[500px] flex flex-col">
+            <div className="bg-gradient-to-r from-green-300 to-green-200 dark:from-zinc-700 dark:to-zinc-600 p-1 rounded-xl shadow-xl flex-1">
+              <div className="bg-white dark:bg-zinc-900 p-8 rounded-xl h-full flex flex-col justify-center">
+                <p className="text-base sm:text-lg lg:text-xl text-gray-700 dark:text-gray-300">
+                  ShareMitra is an innovative platform designed to empower users by providing opportunities to earn extra income through completing simple online tasks. Our user-friendly interface and reliable system ensure that every task is straightforward and rewarding. Whether you’re looking for flexible work hours or an additional source of income, ShareMitra offers a variety of tasks that cater to your skills and interests. Our secure payment system and responsive support team guarantee prompt assistance and timely payments. Join our community today and start your journey towards financial freedom.
+                </p>
+              </div>
+            </div>
+          </div>
 
-        <div className="relative pt-[56.25%] rounded-xl shadow-lg overflow-hidden">
-          <iframe
-            className="absolute top-0 left-0 w-full h-full"
-            src="https://www.youtube.com/embed/MpsobHw-2kg?autoplay=1&mute=1&controls=1&rel=0"
-            title="Vedic Video"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
+          {/* Video Container */}
+          <div className="min-h-[500px] flex flex-col">
+            <div className="bg-gradient-to-r from-green-300 to-green-200 dark:from-zinc-700 dark:to-zinc-600 p-1 rounded-xl shadow-xl flex-1">
+              <div className="bg-white dark:bg-zinc-900 rounded-xl overflow-hidden relative h-full">
+                <iframe
+                  className="absolute inset-0 w-full h-full"
+                  src="https://www.youtube.com/embed/MpsobHw-2kg?autoplay=0&mute=1&controls=1&rel=0"
+                  title="ShareMitra Video"
+                  allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -268,7 +307,7 @@ const HomePage: React.FC = () => {
 
       <section id="how-to-do" className="w-full bg-white dark:bg-zinc-900 py-20 px-6">
         <h2 className="text-4xl font-bold mb-12 text-green-800 dark:text-green-100 text-center">
-          How to Complete a Task
+          How to Do ?
         </h2>
 
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -309,11 +348,10 @@ const HomePage: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-2 text-green-800 dark:text-green-200 text-center">
-              <h4 className="font-semibold text-lg mb-2">Info</h4>
-              <button onClick={() => router.push("/home#about")} className="hover:text-green-900 dark:hover:text-white transition-colors">About</button>
-              <button onClick={() => router.push("/home#how-to-do")} className="hover:text-green-900 dark:hover:text-white transition-colors">How to Do</button>
-              <button onClick={() => router.push("/contact")} className="hover:text-green-900 dark:hover:text-white transition-colors">Contact Us</button>
-              <button onClick={() => router.push("/terms-of-service")} className="hover:text-green-900 dark:hover:text-white transition-colors">Terms of Service</button>
+              <h4 className="font-semibold text-lg mb-2">Useful Links</h4>
+              <button onClick={() => router.push("/home#about")} className="hover:text-green-900 dark:hover:text-white transition-colors cursor-pointer">About</button>
+              <button onClick={() => router.push("/home#how-to-do")} className="hover:text-green-900 dark:hover:text-white transition-colors cursor-pointer">How to Do</button>
+              <button onClick={() => router.push("/terms-of-service")} className="hover:text-green-900 dark:hover:text-white transition-colors cursor-pointer">Terms of Service</button>
             </div>
 
             <div className="flex flex-col gap-2 text-green-800 dark:text-green-200 text-center">
@@ -323,9 +361,8 @@ const HomePage: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-2 text-green-800 dark:text-green-200 text-center">
-              <h4 className="font-semibold text-lg mb-2">Account</h4>
-              <button onClick={() => router.push("/login")} className="hover:text-green-900 dark:hover:text-white transition-colors">Login</button>
-              <button onClick={() => router.push("/signup")} className="hover:text-green-900 dark:hover:text-white transition-colors">Sign Up</button>
+              <h4 className="font-semibold text-lg mb-2">Contact</h4>
+              <button onClick={() => router.push("/contact-us")} className="hover:text-green-900 dark:hover:text-white transition-colors cursor-pointer">Contact Us</button>
             </div>
           </div>
 

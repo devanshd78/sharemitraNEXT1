@@ -16,7 +16,7 @@ const AdminLogin = () => {
       const userStr = localStorage.getItem("user");
       const user = userStr ? JSON.parse(userStr) : null;
       if (user && user.role === "admin") {
-        router.replace("/advertiser");
+        router.replace("/advertiser/dashboard");
       }
     }
   }, [router]);
@@ -28,7 +28,7 @@ const AdminLogin = () => {
     // Mock authentication check
     if (email === "admin@example.com" && password === "admin123") {
       localStorage.setItem("user", JSON.stringify({ role: "admin" }));
-      router.replace("/advertiser");
+      router.replace("/advertiser/dashboard");
     } else {
       alert("Invalid credentials");
     }

@@ -92,12 +92,6 @@ const Navbar: React.FC = () => {
             Prev Task
           </span>
           <span
-            onClick={() => router.push("/home#how-to-do")}
-            className="text-base font-semibold cursor-pointer hover:text-green-500 dark:hover:text-green-400"
-          >
-            How to do
-          </span>
-          <span
             onClick={() => router.push("/contact-us")}
             className="text-base font-semibold cursor-pointer hover:text-green-500 dark:hover:text-green-400"
           >

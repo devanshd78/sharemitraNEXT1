@@ -3,48 +3,64 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
-interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  message: string;
-  createdAt: string;
-  updatedAt: string;
+interface TaskHistory {
+  taskId: string;
+  userId: string;
+  matched_link: string;
+  group_name: string;
+  participant_count: number;
+  details: any;
+  verified: boolean;
+  verifiedAt: string;
 }
 
 const TaskStatus: React.FC = () => {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<TaskHistory[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Determine status string and corresponding style classes
+  const getStatusInfo = (verified: boolean) => {
+    if (verified) {
+      return { status: "Completed", style: "bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100" };
+    } else {
+      return { status: "Pending", style: "bg-yellow-100 dark:bg-yellow-700 text-yellow-800 dark:text-yellow-100" };
+    }
+  };
 
   useEffect(() => {
-    const fetchTasks = async () => {
+    const fetchTaskHistory = async () => {
       try {
-        const response = await fetch("/api/tasks"); // Update with actual API endpoint
-        if (!response.ok) throw new Error("Failed to fetch tasks");
-        const data: Task[] = await response.json();
-        setTasks(data);
-      } catch (error) {
-        console.error("Error fetching tasks:", error);
+        // Get the userId from local storage (adjust the key if necessary)
+        const storedUser = localStorage.getItem("user");
+        const user = storedUser ? JSON.parse(storedUser) : null;
+        if (!user || !user.userId) {
+          throw new Error("User not found. Please log in.");
+        }
+
+        const response = await fetch("http://127.0.0.1:5000/task/history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.userId }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch task history");
+        }
+
+        const json = await response.json();
+        // Expecting { userId: string, task_history: TaskHistory[] }
+        setTasks(json.task_history);
+      } catch (error: any) {
+        console.error("Error fetching task history:", error);
+        setError(error.message || "An error occurred while fetching task history.");
       } finally {
         setLoading(false);
       }
     };
 
-    //fetchTasks();
+    fetchTaskHistory();
   }, []);
-
-  const statusStyles = (message: string) => {
-    switch (message) {
-      case "Completed":
-        return "bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100";
-      case "Pending":
-        return "bg-yellow-100 dark:bg-yellow-700 text-yellow-800 dark:text-yellow-100";
-      case "Not Completed":
-        return "bg-red-100 dark:bg-red-700 text-red-700 dark:text-red-100";
-      default:
-        return "bg-gray-100 text-gray-700 dark:bg-zinc-700 dark:text-gray-200";
-    }
-  };
 
   return (
     <div className="min-h-screen bg-green-50 dark:bg-zinc-950 text-gray-800 dark:text-gray-100 p-6 sm:px-6">
@@ -55,8 +71,9 @@ const TaskStatus: React.FC = () => {
 
         {loading ? (
           <p className="text-center text-gray-600 dark:text-gray-400">Loading tasks...</p>
+        ) : error ? (
+          <p className="text-center text-red-500">{error}</p>
         ) : tasks.length === 0 ? (
-          // 👇 Show this message if no tasks are available
           <div className="flex flex-col items-center justify-center py-10">
             <span className="text-6xl mb-4">📝</span>
             <p className="text-lg text-gray-700 dark:text-gray-300">
@@ -76,30 +93,29 @@ const TaskStatus: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {tasks.map((task, index) => (
-                  <motion.tr
-                    key={task.id}
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: index * 0.1 }}
-                    className="bg-white dark:bg-zinc-800 border border-green-100 dark:border-green-700 rounded-lg shadow-sm hover:bg-green-50 dark:hover:bg-green-900 transition-colors"
-                  >
-                    <td className="px-4 py-4 font-semibold text-gray-800 dark:text-gray-100">{index + 1}</td>
-                    <td className="px-4 py-4 text-gray-700 dark:text-gray-200">{task.title}</td>
-                    <td className="px-4 py-4">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${statusStyles(
-                          task.message
-                        )}`}
-                      >
-                        {task.message}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                      {new Date(task.createdAt).toLocaleString()}
-                    </td>
-                  </motion.tr>
-                ))}
+                {tasks.map((task, index) => {
+                  const { status, style } = getStatusInfo(task.verified);
+                  return (
+                    <motion.tr
+                      key={task.taskId}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, delay: index * 0.1 }}
+                      className="bg-white dark:bg-zinc-800 border border-green-100 dark:border-green-700 rounded-lg shadow-sm hover:bg-green-50 dark:hover:bg-green-900 transition-colors"
+                    >
+                      <td className="px-4 py-4 font-semibold text-gray-800 dark:text-gray-100">{index + 1}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-200">{task.group_name}</td>
+                      <td className="px-4 py-4">
+                        <span className={`px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${style}`}>
+                          {status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                        {new Date(task.verifiedAt).toLocaleString()}
+                      </td>
+                    </motion.tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

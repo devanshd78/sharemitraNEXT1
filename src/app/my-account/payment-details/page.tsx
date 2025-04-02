@@ -7,7 +7,7 @@ import PaymentModal from "./paymentModal"; // Adjust the import path as necessar
 
 // Define your PaymentMethod interface and any other types here
 interface PaymentMethod {
-  _id: string;
+  paymentId: string;
   userId: string;
   paymentMethod: number; // 1 for bank, other for UPI
   accountHolder?: string;
@@ -154,6 +154,11 @@ const PaymentPage: React.FC = () => {
   };
 
   const handleDeletePayment = async (paymentId: string) => {
+    if (!userId) {
+      Swal.fire("Error", "User not found. Please log in again.", "error");
+      return;
+    }
+  
     const confirmDelete = await Swal.fire({
       title: "Are you sure?",
       text: "You won't be able to recover this payment method!",
@@ -169,7 +174,7 @@ const PaymentPage: React.FC = () => {
         const res = await fetch("http://127.0.0.1:5000/payment/delete", {
           method: "POST", // Using POST instead of DELETE
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paymentId }), // Send paymentId in the request body
+          body: JSON.stringify({ userId, paymentId }),
         });
   
         const data = await res.json();
@@ -184,7 +189,8 @@ const PaymentPage: React.FC = () => {
         Swal.fire("Error", "Failed to delete the payment method.", "error");
       }
     }
-  };  
+  };
+  
 
   return (
     <div className="min-h-screen flex flex-col bg-green-50 dark:bg-zinc-950 p-6 text-gray-800 dark:text-gray-100">
@@ -207,7 +213,7 @@ const PaymentPage: React.FC = () => {
         ) : (
           <div className="grid gap-4">
             {paymentMethods.map((payment) => (
-              <div key={payment._id} className="bg-white dark:bg-zinc-800 border border-green-200 dark:border-green-700 rounded-xl shadow-sm hover:shadow-md transition p-4">
+              <div key={payment.paymentId} className="bg-white dark:bg-zinc-800 border border-green-200 dark:border-green-700 rounded-xl shadow-sm hover:shadow-md transition p-4">
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <h3 className="text-lg font-semibold text-green-900 dark:text-green-200">
@@ -227,10 +233,10 @@ const PaymentPage: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     <button
-                      onClick={() => setExpandedPayment(expandedPayment === payment._id ? null : payment._id)}
+                      onClick={() => setExpandedPayment(expandedPayment === payment.paymentId ? null : payment.paymentId)}
                       className="text-green-600 dark:text-green-300 hover:text-green-800"
                     >
-                      {expandedPayment === payment._id ? <FaChevronUp /> : <FaChevronDown />}
+                      {expandedPayment === payment.paymentId ? <FaChevronUp /> : <FaChevronDown />}
                     </button>
 
                     <button
@@ -241,7 +247,7 @@ const PaymentPage: React.FC = () => {
                     </button>
 
                     <button
-                      onClick={() => handleDeletePayment(payment._id)}
+                      onClick={() => handleDeletePayment(payment.paymentId)}
                       className="text-red-600 dark:text-red-300 hover:text-red-800"
                     >
                       <FaTrash />
@@ -249,7 +255,7 @@ const PaymentPage: React.FC = () => {
                   </div>
                 </div>
 
-                {expandedPayment === payment._id && (
+                {expandedPayment === payment.paymentId && (
                   <div className="mt-4 pt-3 text-sm text-green-800 dark:text-green-200 border-t border-green-200 dark:border-green-600 space-y-1">
                     {payment.paymentMethod === 1 ? (
                       <>
