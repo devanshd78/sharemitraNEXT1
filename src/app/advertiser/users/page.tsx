@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
+import Swal from "sweetalert2";
 
 type User = {
   userId: string;
@@ -23,63 +24,127 @@ type User = {
   phone: string;
   createdAt: string;
   updatedAt: string;
-  // Additional fields from the API can be added here
 };
 
-const UserList = () => {
+const UserList: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [totalUsers, setTotalUsers] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const router = useRouter();
-
-  // Pagination state
+  // Debounced search term state
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>(searchTerm);
   const [pageSize, setPageSize] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
+  const router = useRouter();
+
+  // ---------------------------
+  // Debounce Effect for Search Term
+  // ---------------------------
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300); // Adjust the debounce delay as needed
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]);
+
+  // ---------------------------
+  // Fetch Users from API with Pagination & Search
+  // ---------------------------
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("http://127.0.0.1:5000/user/getlist");
-      if (!res.ok) {
-        throw new Error("Failed to fetch users");
-      }
+      const res = await fetch("http://127.0.0.1:5000/user/getlist", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        // API expects page to be zero-indexed.
+        body: JSON.stringify({
+          keyword: debouncedSearchTerm,
+          page: currentPage - 1,
+          per_page: pageSize,
+        }),
+      });
+
       const data = await res.json();
-      setUsers(data);
+
+      if (!res.ok) {
+        Swal.fire("Error", data.error || "Failed to fetch users", "error");
+        throw new Error(data.error || "Failed to fetch users");
+      }
+
+      setUsers(data.users);
+      setTotalUsers(data.total);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [debouncedSearchTerm, currentPage, pageSize]);
 
+  // Fetch users on initial load and whenever dependencies change.
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
-  // Filter users based on search term
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.userId.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Reset current page when search term or users change
+  // Reset to first page when debounced search term or pageSize changes.
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, users]);
+  }, [debouncedSearchTerm, pageSize]);
 
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredUsers.length / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + pageSize);
+  const totalPages = Math.ceil(totalUsers / pageSize);
+  const showingFrom = totalUsers === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const showingTo = Math.min(currentPage * pageSize, totalUsers);
 
+  // ---------------------------
+  // Navigation & Handlers
+  // ---------------------------
   const handleRowClick = (userId: string) => {
     router.push(`/advertiser/users/user-detail?Id=${userId}`);
   };
 
+  const handleExportExcel = () => {
+    if (totalUsers === 0) {
+      Swal.fire("No users", "There are no users to export.", "info");
+      return;
+    }
+  
+    fetch("http://127.0.0.1:5000/download/users", {
+      method: "GET",
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to download users");
+        }
+        return response.blob();
+      })
+      .then((blob) => {
+        // Create a temporary URL for the blob and trigger the download
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "users.xlsx"; // Adjust file name/extension as needed
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        // Optionally revoke the object URL to free up resources
+        window.URL.revokeObjectURL(url);
+      })
+      .catch((error) => {
+        console.error("Error exporting users:", error);
+        Swal.fire("Error", "Failed to export users.", "error");
+      });
+  };  
+
+  // ---------------------------
+  // Render
+  // ---------------------------
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -87,6 +152,7 @@ const UserList = () => {
       </div>
     );
   }
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -96,52 +162,57 @@ const UserList = () => {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4">
       <Card className="shadow-lg p-2">
-        <CardHeader className="flex flex-col gap-4 py-6">
-          {/* First row: Title centered */}
-          <div className="flex justify-center">
-            <CardTitle className="text-3xl font-bold text-green-700">
-              User List
-            </CardTitle>
-          </div>
-          {/* Second row: Search & Refresh aligned to right */}
-          <div className="flex justify-end">
-            <div className="flex items-center gap-4">
+        {/* Header Area */}
+        <CardHeader className="py-4">
+          <CardTitle className="text-2xl font-bold text-green-700">
+            User Management
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent>
+          {/* Top Controls: Search, Rows per page, Download, Add User */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            {/* Left: Search */}
+            <div className="flex items-center gap-2">
               <Input
                 placeholder="Search users..."
                 value={searchTerm}
-                onChange={(e: any) => setSearchTerm(e.target.value)}
-                className="max-w-xs border-2 border-green-400 focus:ring-2 focus:ring-green-500"
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="border-2 border-green-400 focus:ring-2 focus:ring-green-500"
               />
+            </div>
+
+            {/* Right: Rows dropdown, Download CSV, Add User */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <label htmlFor="pageSize" className="text-green-700 font-medium">
+                  Rows:
+                </label>
+                <select
+                  id="pageSize"
+                  value={pageSize}
+                  onChange={(e) => setPageSize(parseInt(e.target.value))}
+                  className="border-2 border-green-400 rounded px-2 py-1 focus:ring-2 focus:ring-green-500"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+
               <Button
-                onClick={fetchUsers}
+                onClick={handleExportExcel}
                 className="bg-green-600 text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500"
               >
-                Refresh
+                Download Excel
               </Button>
             </div>
           </div>
-          {/* Third row: Rows per page select aligned to right */}
-          <div className="flex justify-end">
-            <div className="flex items-center gap-2">
-              <label htmlFor="pageSize" className="text-green-700 font-medium">
-                Rows per page:
-              </label>
-              <select
-                id="pageSize"
-                value={pageSize}
-                onChange={(e) => setPageSize(parseInt(e.target.value))}
-                className="border-2 border-green-400 rounded px-2 py-1 focus:ring-2 focus:ring-green-500"
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-              </select>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
+
+          {/* Table */}
           <Table>
             <TableHeader>
               <TableRow>
@@ -156,14 +227,14 @@ const UserList = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedUsers.length > 0 ? (
-                paginatedUsers.map((user, index) => (
+              {users.length > 0 ? (
+                users.map((user, index) => (
                   <TableRow
                     key={user.userId}
                     onClick={() => handleRowClick(user.userId)}
                     className="cursor-pointer hover:bg-green-100 transition-colors"
                   >
-                    <TableCell>{startIndex + index + 1}</TableCell>
+                    <TableCell>{(currentPage - 1) * pageSize + index + 1}</TableCell>
                     <TableCell>{user.userId}</TableCell>
                     <TableCell>{user.name}</TableCell>
                     <TableCell>{user.email}</TableCell>
@@ -181,11 +252,21 @@ const UserList = () => {
                 </TableRow>
               )}
             </TableBody>
+
+            {/* Table Caption with Pagination Info */}
             <TableCaption>
-              Page {currentPage} of {totalPages}
+              {totalUsers > 0 ? (
+                <span>
+                  Showing {showingFrom} to {showingTo} of {totalUsers} users
+                </span>
+              ) : (
+                <span>Showing 0 to 0 of 0 users</span>
+              )}
             </TableCaption>
           </Table>
         </CardContent>
+
+        {/* Bottom Pagination Controls */}
         <div className="flex justify-end items-center p-4 space-x-4">
           <Button
             onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
@@ -196,7 +277,7 @@ const UserList = () => {
           </Button>
           <Button
             onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
+            disabled={currentPage === totalPages || totalPages === 0}
             className="bg-green-600 text-white hover:bg-green-700 focus:ring-2 focus:ring-green-500"
           >
             Next

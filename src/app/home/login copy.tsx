@@ -1,9 +1,12 @@
 "use client";
 
-import React, { useState, FormEvent, ChangeEvent, useEffect } from "react";
+import React, { useState, FormEvent, ChangeEvent, useEffect, useTransition, startTransition } from "react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
+import { ConfirmationResult, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
+import { auth } from "../../../firebase";
+
 
 interface LoginData {
   identifier: string; // email or phone
@@ -70,6 +73,11 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
   const [stateOptions, setStateOptions] = useState<StateOption[]>([]);
   const [cityOptions, setCityOptions] = useState<string[]>([]);
 
+  const [resendCountdown, setResendCountdown] = useState(0);
+  const [recaptchaVerifier, setRecaptchaVerifier] = useState<RecaptchaVerifier | null>(null);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [isPending, setTransition] = useTransition();
+
   const [errors, setErrors] = useState<Errors>({});
 
   useEffect(() => {
@@ -89,7 +97,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
   }, []);
 
   useEffect(() => {
-    // Check ?ref= in URL and store in localStorage if present
     const urlParams = new URLSearchParams(window.location.search);
     const ref = urlParams.get("ref");
     if (ref) {
@@ -97,6 +104,31 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       setSignupData((prev) => ({ ...prev, referralCode: ref }));
     }
   }, []);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (resendCountdown > 0) {
+      timer = setTimeout(() =>
+        setResendCountdown(resendCountdown - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [resendCountdown]);
+
+  useEffect(() => {
+    const recaptchaVerifier = new RecaptchaVerifier(
+      auth,
+      "recaptcha-container",
+      {
+        size: "invisible",
+      }
+    );
+
+    setRecaptchaVerifier(recaptchaVerifier);
+
+    return () => {
+      recaptchaVerifier.clear();
+    };
+  }, [auth])
 
   // Validate login
   const validateLogin = (): boolean => {
@@ -128,7 +160,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
   };
 
   // Handle input changes for both login and signup
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (isLogin) {
       setLoginData((prev) => ({ ...prev, [name]: value }));
@@ -180,9 +212,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: error.response
-          ? error.response.data.msg
-          : error.message,
+        text: error.response ? error.response.data.msg : error.message,
         timer: 1500,
         showConfirmButton: false,
       });
@@ -233,9 +263,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: error.response
-            ? error.response.data.msg
-            : error.message,
+          text: error.response ? error.response.data.msg : error.message,
           timer: 1500,
           showConfirmButton: false,
         });
@@ -257,42 +285,18 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
     }
     setShowEmailOtpInput(true);
     setIsSendingEmailOtp(true);
-    // try {
-    //   const response = await axios.post(
-    //     "http://127.0.0.1:5000/user/send_email_otp",
-    //     { email: signupData.email }
-    //   );
-    //   if (response.data.status === 200) {
-    //     Swal.fire({
-    //       icon: "success",
-    //       title: "OTP Sent",
-    //       text: "OTP has been sent to your email.",
-    //       timer: 1500,
-    //       showConfirmButton: false,
-    //     });
-    //     // Update the UI to show the OTP input field.
-    //     setShowEmailOtpInput(true);
-    //     setIsSendingEmailOtp(true);
-    //   } else {
-    //     Swal.fire({
-    //       icon: "error",
-    //       title: "Error",
-    //       text: response.data.msg,
-    //       timer: 1500,
-    //       showConfirmButton: false,
-    //     });
-    //   }
-    // } catch (error: any) {
-    //   Swal.fire({
-    //     icon: "error",
-    //     title: "Error",
-    //     text: error.response ? error.response.data.msg : error.message,
-    //     timer: 1500,
-    //     showConfirmButton: false,
-    //   });
-    // } finally {
-    //   setIsSendingEmailOtp(false);
-    // }
+    // Your email OTP implementation here
+    // For now, we simply simulate the behavior:
+    setTimeout(() => {
+      Swal.fire({
+        icon: "success",
+        title: "OTP Sent",
+        text: "OTP has been sent to your email.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      setIsSendingEmailOtp(false);
+    }, 1000);
   };
 
   const handleVerifyEmailOtp = async () => {
@@ -307,47 +311,20 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       return;
     }
     setIsVerifyingEmailOtp(true);
-    setEmailVerified(true);
-    // try {
-    //   const response = await axios.post(
-    //     "http://127.0.0.1:5000/user/verify_email_otp",
-    //     {
-    //       email: signupData.email,
-    //       otp: signupData.emailOtp,
-    //     }
-    //   );
-    //   if (response.data.status === 200) {
-    //     setEmailVerified(true);
-    //     Swal.fire({
-    //       icon: "success",
-    //       title: "Verified",
-    //       text: "Email verified successfully.",
-    //       timer: 1500,
-    //       showConfirmButton: false,
-    //     });
-    //   } else {
-    //     Swal.fire({
-    //       icon: "error",
-    //       title: "Error",
-    //       text: response.data.msg,
-    //       timer: 1500,
-    //       showConfirmButton: false,
-    //     });
-    //   }
-    // } catch (error: any) {
-    //   Swal.fire({
-    //     icon: "error",
-    //     title: "Error",
-    //     text: error.response ? error.response.data.msg : error.message,
-    //     timer: 1500,
-    //     showConfirmButton: false,
-    //   });
-    // } finally {
-    //   setIsVerifyingEmailOtp(false);
-    // }
+    // Simulate verification
+    setTimeout(() => {
+      setEmailVerified(true);
+      Swal.fire({
+        icon: "success",
+        title: "Verified",
+        text: "Email verified successfully.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      setIsVerifyingEmailOtp(false);
+    }, 1000);
   };
 
-  // ----- Signup OTP Functions for Phone -----
   const handleSendPhoneOtp = async () => {
     if (!signupData.phone) {
       Swal.fire({
@@ -359,41 +336,42 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       });
       return;
     }
-    setShowPhoneOtpInput(true);
-    // try {
-    //   const response = await axios.post(
-    //     "http://127.0.0.1:5000/user/send_phone_otp",
-    //     { phone: signupData.phone }
-    //   );
-    //   if (response.data.status === 200) {
-    //     Swal.fire({
-    //       icon: "success",
-    //       title: "OTP Sent",
-    //       text: "OTP has been sent to your phone.",
-    //       timer: 1500,
-    //       showConfirmButton: false,
-    //     });
-    //   } else {
-    //     Swal.fire({
-    //       icon: "error",
-    //       title: "Error",
-    //       text: response.data.msg,
-    //       timer: 1500,
-    //       showConfirmButton: false,
-    //     });
-    //   }
-    // } catch (error: any) {
-    //   Swal.fire({
-    //     icon: "error",
-    //     title: "Error",
-    //     text: error.response
-    //       ? error.response.data.msg
-    //       : error.message,
-    //     timer: 1500,
-    //     showConfirmButton: false,
-    //   });
-    // }
+  
+    setResendCountdown(60);
+    startTransition(async () => {
+      if (!recaptchaVerifier) {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Recaptcha Verifier is not initialized.",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+        return;
+      }
+  
+      try {
+        const phoneWithCountryCode = "+91" + signupData.phone;
+        const confirmationResult = await signInWithPhoneNumber(
+          auth,
+          phoneWithCountryCode,
+          recaptchaVerifier
+        );
+  
+        setConfirmationResult(confirmationResult);
+      } catch (error: any) {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: error.message,
+          timer: 1500,
+          showConfirmButton: false,
+        });
+        setResendCountdown(0);
+      }
+    });
   };
+  
 
   const handleVerifyPhoneOtp = async () => {
     if (!signupData.phoneOtp) {
@@ -406,44 +384,30 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       });
       return;
     }
-    setPhoneVerified(true);
-    // try {
-    //   const response = await axios.post(
-    //     "http://127.0.0.1:5000/user/verify_phone_otp",
-    //     {
-    //       phone: signupData.phone,
-    //       otp: signupData.phoneOtp,
-    //     }
-    //   );
-    //   if (response.data.status === 200) {
-    //     setPhoneVerified(true);
-    //     Swal.fire({
-    //       icon: "success",
-    //       title: "Verified",
-    //       text: "Phone verified successfully.",
-    //       timer: 1500,
-    //       showConfirmButton: false,
-    //     });
-    //   } else {
-    //     Swal.fire({
-    //       icon: "error",
-    //       title: "Error",
-    //       text: response.data.msg,
-    //       timer: 1500,
-    //       showConfirmButton: false,
-    //     });
-    //   }
-    // } catch (error: any) {
-    //   Swal.fire({
-    //     icon: "error",
-    //     title: "Error",
-    //     text: error.response
-    //       ? error.response.data.msg
-    //       : error.message,
-    //     timer: 1500,
-    //     showConfirmButton: false,
-    //   });
-    // }
+    try {
+      const confirmationResult = window.confirmationResult;
+      if (!confirmationResult) {
+        throw new Error("No OTP request found. Please resend OTP.");
+      }
+      // Confirm the OTP entered by the user.
+      await confirmationResult.confirm(signupData.phoneOtp);
+      setPhoneVerified(true);
+      Swal.fire({
+        icon: "success",
+        title: "Verified",
+        text: "Phone verified successfully.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.message,
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    }
   };
 
   // Handle signup form submission (multi-step)
@@ -499,9 +463,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: error.response
-            ? error.response.data.msg
-            : error.message,
+          text: error.response ? error.response.data.msg : error.message,
           timer: 1500,
           showConfirmButton: false,
         });
@@ -567,8 +529,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                 {/* Identifier Field */}
                 <div className="mb-4">
                   <label className="block mb-1 text-black">
-                    Email or Phone{" "}
-                    <span className="text-red-500">*</span>
+                    Email or Phone <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -719,97 +680,99 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                 )}
 
                 {signupStep === 2 && (
-                  <>
-                    <div className="mb-4">
-                      <label className="block mb-1 text-black">
-                        Phone Number <span className="text-red-500">*</span>
-                      </label>
-                      <div className="flex border border-gray-300 rounded overflow-hidden">
-                        <span className="bg-gray-200 px-3 py-2 text-gray-600 flex items-center">
-                          +91
-                        </span>
-                        <input
-                          type="text"
-                          name="phone"
-                          placeholder="Enter phone number"
-                          value={signupData.phone}
-                          onChange={(e) => {
-                            const numericValue = e.target.value.replace(/\D/g, "");
-                            setSignupData((prev) => ({
-                              ...prev,
-                              phone: numericValue,
-                            }));
-                            setErrors((prev) => ({ ...prev, phone: "" }));
-                          }}
-                          disabled={showPhoneOtpInput}
-                          className={`flex-1 p-2 outline-none text-gray-600 ${showPhoneOtpInput ? "cursor-not-allowed" : ""
-                            }`}
-                          maxLength={10}
-                        />
-                      </div>
-                      {errors.phone && (
-                        <small className="text-red-600">{errors.phone}</small>
-                      )}
-                    </div>
-
-                    {/* Phone OTP Section */}
-                    <div className="mt-2 relative">
-                      {!showPhoneOtpInput && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleSendPhoneOtp();
-                          }}
-                          className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded shadow transition"
-                        >
-                          Send Phone OTP
-                        </button>
-                      )}
-                      {showPhoneOtpInput && (
-                        <div className="relative">
-                          <input
-                            type="text"
-                            name="phoneOtp"
-                            placeholder="Enter Phone OTP"
-                            value={signupData.phoneOtp}
-                            onChange={handleChange}
-                            disabled={phoneVerified}
-                            className={`w-full border border-gray-300 rounded p-2 text-gray-600 ${phoneVerified ? "pr-4 cursor-not-allowed" : "pr-32"
-                              }`}
-                          />
-                          {!phoneVerified ? (
-                            <button
-                              type="button"
-                              onClick={handleVerifyPhoneOtp}
-                              className="absolute top-1/2 right-2 transform -translate-y-1/2 bg-green-600 hover:bg-green-700 text-white font-medium rounded px-3 py-1 shadow transition"
-                            >
-                              Verify OTP
-                            </button>
-                          ) : (
-                            <div className="absolute top-1/2 right-2 transform -translate-y-1/2 flex items-center space-x-1">
-                              <svg
-                                className="w-5 h-5 text-green-600"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M5 13l4 4L19 7"
-                                />
-                              </svg>
-                              <span className="text-green-600 font-medium">Verified</span>
-                            </div>
-                          )}
-                          {errors.phoneOtp && (
-                            <small className="text-red-600">{errors.phoneOtp}</small>
+                  <div>
+                    {!confirmationResult && (
+                      <>
+                        <div className="mb-4">
+                          <label className="block mb-1 text-black">
+                            Phone Number <span className="text-red-500">*</span>
+                          </label>
+                          <div className="flex border border-gray-300 rounded overflow-hidden">
+                            <span className="bg-gray-200 px-3 py-2 text-gray-600 flex items-center">
+                              +91
+                            </span>
+                            <input
+                              type="text"
+                              name="phone"
+                              placeholder="Enter phone number"
+                              value={signupData.phone}
+                              onChange={(e) => {
+                                const numericValue = e.target.value.replace(/\D/g, "");
+                                setSignupData((prev) => ({
+                                  ...prev,
+                                  phone: numericValue,
+                                }));
+                                setErrors((prev) => ({ ...prev, phone: "" }));
+                              }}
+                              disabled={showPhoneOtpInput}
+                              className={`flex-1 p-2 outline-none text-gray-600 ${showPhoneOtpInput ? "cursor-not-allowed" : ""
+                                }`}
+                              maxLength={10}
+                            />
+                          </div>
+                          {errors.phone && (
+                            <small className="text-red-600">{errors.phone}</small>
                           )}
                         </div>
-                      )}
-                    </div>
-                  </>
+
+                        <div className="mt-2 relative">
+                          {!showPhoneOtpInput && (
+                            <button
+                              type="button"
+                              onClick={handleSendPhoneOtp}
+                              className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded shadow transition"
+                            >
+                              Send Phone OTP
+                            </button>
+                          )}
+                          {showPhoneOtpInput && (
+                            <div className="relative">
+                              <input
+                                type="text"
+                                name="phoneOtp"
+                                placeholder="Enter Phone OTP"
+                                value={signupData.phoneOtp}
+                                onChange={handleChange}
+                                disabled={phoneVerified}
+                                className={`w-full border border-gray-300 rounded p-2 text-gray-600 ${phoneVerified ? "pr-4 cursor-not-allowed" : "pr-32"
+                                  }`}
+                              />
+                              {!phoneVerified ? (
+                                <button
+                                  type="button"
+                                  onClick={handleVerifyPhoneOtp}
+                                  className="absolute top-1/2 right-2 transform -translate-y-1/2 bg-green-600 hover:bg-green-700 text-white font-medium rounded px-3 py-1 shadow transition"
+                                >
+                                  Verify OTP
+                                </button>
+                              ) : (
+                                <div className="absolute top-1/2 right-2 transform -translate-y-1/2 flex items-center space-x-1">
+                                  <svg
+                                    className="w-5 h-5 text-green-600"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                  <span className="text-green-600 font-medium">Verified</span>
+                                </div>
+                              )}
+                              {errors.phoneOtp && (
+                                <small className="text-red-600">{errors.phoneOtp}</small>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                    
+                  </div>
                 )}
 
                 {signupStep === 3 && (
@@ -931,6 +894,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
             )}
           </div>
         </div>
+        <div id="recaptcha-container" />
       </div>
     </>
   );

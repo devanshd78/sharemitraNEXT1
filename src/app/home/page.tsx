@@ -372,7 +372,7 @@ const HomePage: React.FC = () => {
           </p>
         </div>
       </footer>
-      {showLoginModal && <LoginModal onClose={() => { closeLoginModal(); router.refresh(); }} />}
+      {showLoginModal && <LoginModal onClose={() => { closeLoginModal(); window.location.reload(); }} />}
     </div>
   );
 };

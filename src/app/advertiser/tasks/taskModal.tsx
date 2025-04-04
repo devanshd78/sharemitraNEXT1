@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import React, { FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
@@ -21,11 +21,14 @@ interface TaskModalProps {
     title: string;
     description: string;
     message: string;
+    task_price: number;
+    hidden: number;
   };
   handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  handleCreateTask: (e: FormEvent<HTMLFormElement>) => void;
+  handleSubmit: (e: FormEvent<HTMLFormElement>) => void;
   creating: boolean;
   formError: string | null;
+  isEditing?: boolean;
 }
 
 const TaskModal: React.FC<TaskModalProps> = ({
@@ -33,21 +36,26 @@ const TaskModal: React.FC<TaskModalProps> = ({
   setOpen,
   formData,
   handleInputChange,
-  handleCreateTask,
+  handleSubmit,
   creating,
   formError,
+  isEditing = false,
 }) => {
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Add Task</Button>
+        <Button>{isEditing ? "Edit Task" : "Add Task"}</Button>
       </DialogTrigger>
       <DialogContent className="w-full max-w-[90%] sm:max-w-md md:max-w-lg mx-auto p-4 bg-white rounded-lg shadow-lg">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">Add Task</DialogTitle>
+          <DialogTitle className="text-xl font-semibold">
+            {isEditing ? "Edit Task" : "Add Task"}
+          </DialogTitle>
         </DialogHeader>
         {formError && <p className="text-red-500 mb-2 text-sm">{formError}</p>}
-        <form onSubmit={handleCreateTask} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Title */}
           <div>
             <Label htmlFor="title" className="block text-sm font-medium text-gray-700">
               Title
@@ -62,6 +70,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
               className="mt-1"
             />
           </div>
+          {/* Description */}
           <div>
             <Label htmlFor="description" className="block text-sm font-medium text-gray-700">
               Description
@@ -74,6 +83,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
               className="mt-1"
             />
           </div>
+          {/* Message (URL) */}
           <div>
             <Label htmlFor="message" className="block text-sm font-medium text-gray-700">
               Message (URL)
@@ -88,6 +98,60 @@ const TaskModal: React.FC<TaskModalProps> = ({
               className="mt-1"
             />
           </div>
+          {/* Task Amount */}
+          <div>
+            <Label htmlFor="task_price" className="block text-sm font-medium text-gray-700">
+              Task Amount
+            </Label>
+            <Input
+              id="task_price"
+              type="number"
+              name="task_price"
+              value={formData.task_price}
+              onChange={handleInputChange}
+              required
+              className="mt-1"
+            />
+          </div>
+          {/* Hide Task Toggle */}
+          <div className="flex items-center space-x-3">
+            <Label htmlFor="hidden" className="block text-sm font-medium text-gray-700">
+              Hide Task
+            </Label>
+            <div
+              className={`relative inline-block w-10 h-6 rounded-full transition-colors duration-200 ease-in-out cursor-pointer ${
+                formData.hidden ? 'bg-green-600' : 'bg-gray-300'
+              }`}
+              onClick={() => {
+                // Toggle the value manually when clicking on the custom toggle
+                const newValue = formData.hidden ? 0 : 1;
+                const syntheticEvent = {
+                  target: {
+                    name: 'hidden',
+                    value: newValue, // Send as number
+                  },
+                } as unknown as React.ChangeEvent<HTMLInputElement>;
+                handleInputChange(syntheticEvent);
+              }}
+            >
+              <span
+                className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-in-out ${
+                  formData.hidden ? 'translate-x-4' : ''
+                }`}
+              ></span>
+              {/* Hidden checkbox for accessibility */}
+              <input
+                id="hidden"
+                type="checkbox"
+                name="hidden"
+                checked={Boolean(formData.hidden)}
+                onChange={() => {}}
+                className="opacity-0 absolute w-full h-full cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {/* Form Actions */}
           <div className="flex justify-end space-x-2">
             <DialogClose asChild>
               <Button variant="outline" disabled={creating}>
@@ -95,7 +159,13 @@ const TaskModal: React.FC<TaskModalProps> = ({
               </Button>
             </DialogClose>
             <Button type="submit" disabled={creating}>
-              {creating ? 'Creating...' : 'Create Task'}
+              {creating
+                ? isEditing
+                  ? 'Updating...'
+                  : 'Creating...'
+                : isEditing
+                  ? 'Update Task'
+                  : 'Create Task'}
             </Button>
           </div>
         </form>

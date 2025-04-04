@@ -50,6 +50,7 @@ const Navbar: React.FC = () => {
     localStorage.removeItem("referralCode");
     setUser(null);
     router.push("/home");
+    window.location.reload();
   };
 
   return (
