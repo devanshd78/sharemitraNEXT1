@@ -509,6 +509,61 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
     }
   };
 
+  interface LoginSubmitResponse {
+    user: any; // Replace `any` with the actual user type if known
+  }
+
+  interface LoginSubmitError {
+    response?: {
+      data?: {
+        error?: string;
+      };
+    };
+  }
+
+  const handleLoginSubmit1 = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
+    setErrors({});
+
+    if (!loginData.identifier) {
+      setErrors({ identifier: "Email or phone is required" });
+      return;
+    }
+
+    if (!loginOtpSent) {
+      // Simulate OTP being sent
+      setLoginOtpSent(true);
+      // You can also add a fake timer/notification if needed
+      return;
+    }
+    try {
+      const response = await axios.post<LoginSubmitResponse>(
+        "http://127.0.0.1:5000/user/dummy",
+        {
+          email: loginData.identifier.includes("@") ? loginData.identifier : "",
+          phone: !loginData.identifier.includes("@") ? loginData.identifier : "",
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      // Handle success
+      console.log("Login Success:", response.data.user);
+      localStorage.setItem("user", JSON.stringify(response.data.user));
+      localStorage.setItem("isLoggedIn", "true");
+      onClose(); // Close the modal
+      // Redirect or save token etc. here
+    } catch (error: unknown) {
+      const err = error as LoginSubmitError;
+      console.error(err);
+      const msg = err.response?.data?.error || "Login failed";
+      alert(msg);
+    }
+  };
+
   // ----- Render -----
   return (
     <>
@@ -563,7 +618,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
           {/* Main Content */}
           <div className="p-5">
             {isLogin ? (
-              <form onSubmit={handleLoginSubmit}>
+              <form onSubmit={handleLoginSubmit1}>
                 {/* Identifier Field */}
                 <div className="mb-4">
                   <label className="block mb-1 text-black">

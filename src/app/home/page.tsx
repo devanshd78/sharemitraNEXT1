@@ -16,11 +16,13 @@ import LoginModal from "./login";
 import TaskUploadModal from "./screenshotModal";
 
 interface Task {
-  taskId: string;         // 👈 Add this
+  taskId: string;
   title: string;
   message: string;
   description: string;
-  created_at?: string;
+  status: string;
+  task_price: number;
+  createdAt?: string;
   updatedAt?: string;
 }
 

@@ -66,7 +66,6 @@ const TaskUploadModal: React.FC<Props> = ({ taskId, onClose }) => {
         formData.append("image", image1);
         formData.append("group_image", image2);
         formData.append("taskId", taskId ?? "");
-    
         // Retrieve userId from localStorage
         const storedUser = localStorage.getItem("user");
         const user = storedUser ? JSON.parse(storedUser) : null;
