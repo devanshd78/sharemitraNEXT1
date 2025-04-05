@@ -8,6 +8,14 @@ interface ProfileType {
   name: string;
   email: string;
   phone: string;
+  dob?: string;
+  state?: string;
+  city?: string;
+  referralCode?: string;
+  totalPayoutAmount?: number;
+  // createdAt and updatedAt can be added if you wish to display them
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 const Profile: React.FC = () => {
@@ -18,6 +26,11 @@ const Profile: React.FC = () => {
     name: "",
     email: "",
     phone: "",
+    dob: "",
+    state: "",
+    city: "",
+    referralCode: "",
+    totalPayoutAmount: 0,
   });
 
   useEffect(() => {
@@ -32,11 +45,12 @@ const Profile: React.FC = () => {
     try {
       const res = await fetch(`http://localhost:5000/user/getbyid?userId=${userId}`);
       const data = await res.json();
-      if (data.status === 200) {
-        setProfile(data.user);
-        localStorage.setItem("user", JSON.stringify(data.user));
+      if (res.ok) {
+        setProfile(data);
+        // Store the entire user object in localStorage
+        localStorage.setItem("user", JSON.stringify(data));
       } else {
-        showError(data.msg);
+        showError(data.error || "Failed to fetch profile.");
       }
     } catch {
       showError("Failed to fetch profile.");
@@ -44,13 +58,12 @@ const Profile: React.FC = () => {
       setLoading(false);
     }
   };
+  
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-
-    // Allow only numbers for phone number
+    // For phone number, allow only digits
     const processedValue = name === "phone" ? value.replace(/\D/g, "") : value;
-
     setProfile((prev) => ({ ...prev, [name]: processedValue }));
   };
 
@@ -59,7 +72,6 @@ const Profile: React.FC = () => {
     if (profile.phone.length !== 10) {
       return showError("Phone number must be exactly 10 digits.");
     }
-
     try {
       const res = await fetch("http://localhost:5000/user/updatedetails", {
         method: "POST",
@@ -67,7 +79,6 @@ const Profile: React.FC = () => {
         body: JSON.stringify(profile),
       });
       const data = await res.json();
-
       if (data.status === 200) {
         localStorage.setItem("user", JSON.stringify(profile));
         setIsEditing(false);
@@ -99,7 +110,7 @@ const Profile: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-green-50 dark:bg-zinc-950 p-6">
-      <div className="max-w-xl mx-auto bg-white dark:bg-zinc-900 rounded-3xl shadow-lg border border-green-200 dark:border-zinc-700 p-8 md:p-10">
+      <div className="max-w-xl mx-auto bg-white dark:bg-zinc-900 rounded-3xl shadow-lg border border-green-200 dark:border-green-700 p-8 md:p-10">
         <h2 className="text-4xl font-bold text-center mb-10 text-green-800 dark:text-green-200">
           Profile Settings
         </h2>
@@ -122,6 +133,79 @@ const Profile: React.FC = () => {
               />
             </div>
           ))}
+
+          {/* Date of Birth */}
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Date of Birth
+            </label>
+            <input
+              type="date"
+              name="dob"
+              value={profile.dob || ""}
+              onChange={handleChange}
+              disabled={!isEditing}
+              className={inputClass(isEditing)}
+            />
+          </div>
+
+          {/* State */}
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+              State
+            </label>
+            <input
+              type="text"
+              name="state"
+              value={profile.state || ""}
+              onChange={handleChange}
+              disabled={!isEditing}
+              className={inputClass(isEditing)}
+            />
+          </div>
+
+          {/* City */}
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+              City
+            </label>
+            <input
+              type="text"
+              name="city"
+              value={profile.city || ""}
+              onChange={handleChange}
+              disabled={!isEditing}
+              className={inputClass(isEditing)}
+            />
+          </div>
+
+          {/* Referral Code (read-only) */}
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Referral Code
+            </label>
+            <input
+              type="text"
+              name="referralCode"
+              value={profile.referralCode || ""}
+              disabled
+              className={inputClass(false)}
+            />
+          </div>
+
+          {/* Total Payout Amount (read-only) */}
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Total Payout Amount
+            </label>
+            <input
+              type="number"
+              name="totalPayoutAmount"
+              value={profile.totalPayoutAmount || 0}
+              disabled
+              className={inputClass(false)}
+            />
+          </div>
 
           <div className="flex justify-between mt-8">
             {isEditing ? (

@@ -21,6 +21,12 @@ import {
   DialogClose,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Lexend } from 'next/font/google';
+
+const lexend = Lexend({
+  subsets: ['latin'],  // adjust if needed
+  weight: '400',       // specifying the weight 400
+});
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -73,7 +79,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-green-50">
+    <div className={`flex flex-col md:flex-row min-h-screen bg-green-50 ${lexend.className}`}>
       {/* Sidebar for desktop */}
       <aside className="hidden md:block md:w-64 border-r border-green-200 p-6 bg-white">
         <div className="mb-6">

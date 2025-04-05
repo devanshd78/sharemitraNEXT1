@@ -8,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -23,36 +22,62 @@ interface PaymentMethod {
   paymentMethod: number; // 0 for UPI, 1 for Bank Transfer
 }
 
+interface WalletData {
+  totalEarned: number;
+  availableToWithdraw: number;
+}
+
 const WalletPage = () => {
-  const [walletData, setWalletData] = useState({
+  const [walletData, setWalletData] = useState<WalletData>({
     totalEarned: 500,
     availableToWithdraw: 500,
   });
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [error, setError] = useState("");
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
 
   const router = useRouter();
-  // Fetch wallet data and payment methods from localStorage and API respectively
+
+  // On mount, retrieve the stored user and fetch wallet info & payment methods.
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       const parsed = JSON.parse(storedUser);
-      setWalletData({
-        totalEarned: parsed.totalEarned || 500,
-        availableToWithdraw: parsed.availableToWithdraw || 500,
-      });
       if (parsed.userId) {
+        fetchWalletInfo(parsed.userId);
         fetchPaymentMethods(parsed.userId);
       }
     }
   }, []);
 
+  // Fetch wallet info from the API endpoint.
+  const fetchWalletInfo = async (userId: string) => {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:5000/wallet/info?userId=${userId}`
+      );
+      const data = await response.json();
+      if (response.ok) {
+        // Assuming your API returns fields "total_earning" and "remaining_balance"
+        setWalletData({
+          totalEarned: data.total_earning || 500,
+          availableToWithdraw: data.remaining_balance || 500,
+        });
+      } else {
+        console.error("Error fetching wallet info:", data.error);
+      }
+    } catch (err) {
+      console.error("Error fetching wallet info:", err);
+    }
+  };
+
+  // Fetch payment methods from the API.
   const fetchPaymentMethods = async (userId: string) => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/payment/payment-details/user/${userId}`);
+      const response = await fetch(
+        `http://127.0.0.1:5000/payment/payment-details/user/${userId}`
+      );
       const data = await response.json();
       if (data.status === 200) {
         setPaymentMethods(data.payments);
@@ -115,7 +140,9 @@ const WalletPage = () => {
     }
 
     // Find the selected payment method details to extract payment type
-    const selectedPM = paymentMethods.find((pm) => pm.paymentId === selectedPaymentMethod);
+    const selectedPM = paymentMethods.find(
+      (pm) => pm.paymentId === selectedPaymentMethod
+    );
     if (!selectedPM) {
       Swal.fire({
         title: "Payment Method Error",
@@ -154,7 +181,8 @@ const WalletPage = () => {
           setOpenPaymentDialog(false);
           setWithdrawAmount("");
           setSelectedPaymentMethod("");
-          // Optionally update wallet data by re-fetching from API or local storage.
+          // Optionally update wallet data by re-fetching from API.
+          fetchWalletInfo(user.userId);
         });
       } else {
         Swal.fire({
@@ -180,16 +208,26 @@ const WalletPage = () => {
   return (
     <div className="min-h-screen bg-green-50 dark:bg-zinc-950 p-6">
       <div className="max-w-xl mx-auto bg-white dark:bg-zinc-900 rounded-3xl shadow-lg p-8 border border-green-200 dark:border-green-700">
-        <h2 className="text-4xl font-bold text-center text-green-800 dark:text-green-100 mb-6">Wallet</h2>
+        <h2 className="text-4xl font-bold text-center text-green-800 dark:text-green-100 mb-6">
+          Wallet
+        </h2>
 
         <div className="bg-green-100 dark:bg-zinc-800 rounded-xl p-6 mb-6 space-y-4">
           <div className="flex justify-between items-center">
-            <span className="text-lg font-semibold text-green-800 dark:text-green-200">Total Earned</span>
-            <span className="text-xl font-bold text-green-900 dark:text-green-100">₹ {walletData.totalEarned}</span>
+            <span className="text-lg font-semibold text-green-800 dark:text-green-200">
+              Total Earned
+            </span>
+            <span className="text-xl font-bold text-green-900 dark:text-green-100">
+              ₹ {walletData.totalEarned}
+            </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-lg font-semibold text-green-800 dark:text-green-200">Available to Withdraw</span>
-            <span className="text-xl font-bold text-green-900 dark:text-green-100">₹ {walletData.availableToWithdraw}</span>
+            <span className="text-lg font-semibold text-green-800 dark:text-green-200">
+              Available to Withdraw
+            </span>
+            <span className="text-xl font-bold text-green-900 dark:text-green-100">
+              ₹ {walletData.availableToWithdraw}
+            </span>
           </div>
         </div>
 
@@ -201,10 +239,11 @@ const WalletPage = () => {
           <DialogTrigger asChild>
             <Button
               disabled={walletData.availableToWithdraw < 500}
-              className={`w-full py-3 text-white font-semibold rounded-lg transition ${walletData.availableToWithdraw >= 500
-                ? "bg-green-600 hover:bg-green-700"
-                : "bg-gray-400 cursor-not-allowed"
-                }`}
+              className={`w-full py-3 text-white font-semibold rounded-lg transition ${
+                walletData.availableToWithdraw >= 500
+                  ? "bg-green-600 hover:bg-green-700"
+                  : "bg-gray-400 cursor-not-allowed"
+              }`}
             >
               Withdraw Now
             </Button>
@@ -252,18 +291,21 @@ const WalletPage = () => {
                           onChange={() => setSelectedPaymentMethod(pm.paymentId)}
                           className="mr-2"
                         />
-                        <span className="text-green-800 dark:text-green-200">{labelText}</span>
+                        <span className="text-green-800 dark:text-green-200">
+                          {labelText}
+                        </span>
                       </label>
                     );
                   })}
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">No payment methods available.</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    No payment methods available.
+                  </p>
                   <Button onClick={() => router.push("/my-account/payment-details")}>
                     Add Payment Method
                   </Button>
-
                 </>
               )}
             </div>

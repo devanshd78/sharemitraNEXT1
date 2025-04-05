@@ -13,10 +13,8 @@ interface LoginData {
 interface SignupData {
   name: string;
   email: string;
-  emailOtp: string;
   phone: string;
-  phoneOtp: string;
-  dateOfBirth: string;
+  dob: string;
   state: string;
   city: string;
   referralCode: string;
@@ -52,10 +50,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
   const [signupData, setSignupData] = useState<SignupData>({
     name: "",
     email: "",
-    emailOtp: "",
     phone: "",
-    phoneOtp: "",
-    dateOfBirth: "",
+    dob: "",
     state: "",
     city: "",
     referralCode: "",
@@ -69,6 +65,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
   const [showPhoneOtpInput, setShowPhoneOtpInput] = useState(false);
   const [stateOptions, setStateOptions] = useState<StateOption[]>([]);
   const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [emailOtp, setEmailOtp] = useState("");
+  const [phoneOtp, setPhoneOtp] = useState("");
 
   const [errors, setErrors] = useState<Errors>({});
 
@@ -118,8 +116,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       if (!signupData.phone) tempErrors.phone = "Phone number is required";
       if (!phoneVerified) tempErrors.phoneOtp = "Phone not verified";
     } else if (signupStep === 3) {
-      if (!signupData.dateOfBirth)
-        tempErrors.dateOfBirth = "Date of Birth is required";
+      if (!signupData.dob)
+        tempErrors.dob = "Date of Birth is required";
       if (!signupData.state) tempErrors.state = "State is required";
       if (!signupData.city) tempErrors.city = "City is required";
     }
@@ -140,63 +138,78 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
   };
 
   // ----- Login OTP Functions -----
-  const handleSendLoginOtp = async () => {
-    if (!loginData.identifier) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "Please enter your email or phone.",
-        timer: 1500,
-        showConfirmButton: false,
-      });
-      return;
-    }
-    try {
-      const response = await axios.post(
-        "http://127.0.0.1:5000/user/send_login_otp",
-        {
-          identifier: loginData.identifier,
+  const handleLoginSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!validateLogin()) return;
+  
+    // If OTP hasn't been sent yet, send OTP based on identifier type.
+    if (!loginOtpSent) {
+      try {
+        if (loginData.identifier.includes("@")) {
+          // Send OTP to email
+          const response = await axios.post(
+            "http://127.0.0.1:5000/user/login/sendEmailOTP",
+            {
+              email: loginData.identifier,
+            }
+          );
+          if (response.data.message) {
+            setLoginOtpSent(true);
+            Swal.fire({
+              icon: "success",
+              title: "OTP Sent",
+              text: "OTP has been sent to your email.",
+              timer: 1500,
+              showConfirmButton: false,
+            });
+          } else {
+            Swal.fire({
+              icon: "error",
+              title: "Error",
+              text: response.data.error || "Failed to send OTP.",
+              timer: 1500,
+              showConfirmButton: false,
+            });
+          }
+        } else {
+          // Send OTP to phone
+          const response = await axios.post(
+            "http://127.0.0.1:5000/user/login/sendOTP",
+            {
+              phone: loginData.identifier,
+            }
+          );
+          if (response.data.message === "OTP sent for login") {
+            setLoginOtpSent(true);
+            Swal.fire({
+              icon: "success",
+              title: "OTP Sent",
+              text: "OTP has been sent to your phone.",
+              timer: 1500,
+              showConfirmButton: false,
+            });
+          } else {
+            Swal.fire({
+              icon: "error",
+              title: "Error",
+              text: response.data.error || "Failed to send OTP.",
+              timer: 1500,
+              showConfirmButton: false,
+            });
+          }
         }
-      );
-      if (response.data.status === 200) {
-        setLoginOtpSent(true);
-        Swal.fire({
-          icon: "success",
-          title: "OTP Sent",
-          text: "OTP has been sent to your email/phone.",
-          timer: 1500,
-          showConfirmButton: false,
-        });
-      } else {
+      } catch (error: any) {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: response.data.msg,
+          text: error.response ? error.response.data.error : error.message,
           timer: 1500,
           showConfirmButton: false,
         });
       }
-    } catch (error: any) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: error.response
-          ? error.response.data.msg
-          : error.message,
-        timer: 1500,
-        showConfirmButton: false,
-      });
-    }
-  };
-
-  const handleLoginSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!validateLogin()) return;
-
-    if (!loginOtpSent) {
-      await handleSendLoginOtp();
       return;
     } else {
+      // If OTP has been sent, proceed with verification.
       if (!loginData.otp) {
         Swal.fire({
           icon: "error",
@@ -208,14 +221,27 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
         return;
       }
       try {
-        const response = await axios.post(
-          "http://127.0.0.1:5000/user/login_by_otp",
-          {
-            identifier: loginData.identifier,
-            otp: loginData.otp,
-          }
-        );
-        if (response.data.status === 200) {
+        let response;
+        if (loginData.identifier.includes("@")) {
+          // Verify OTP for email login
+          response = await axios.post(
+            "http://127.0.0.1:5000/user/login/verifyEmailOTP",
+            {
+              email: loginData.identifier,
+              otp: loginData.otp,
+            }
+          );
+        } else {
+          // Verify OTP for phone login
+          response = await axios.post(
+            "http://127.0.0.1:5000/user/login/verifyOTP",
+            {
+              phone: loginData.identifier,
+              otp: loginData.otp,
+            }
+          );
+        }
+        if (response.data.message === "Login OTP verified successfully") {
           localStorage.setItem("user", JSON.stringify(response.data.user));
           localStorage.setItem("isLoggedIn", "true");
           onClose();
@@ -233,9 +259,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: error.response
-            ? error.response.data.msg
-            : error.message,
+          text: error.response ? error.response.data.error : error.message,
           timer: 1500,
           showConfirmButton: false,
         });
@@ -296,7 +320,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
   };
 
   const handleVerifyEmailOtp = async () => {
-    if (!signupData.emailOtp) {
+    if (!emailOtp) {
       Swal.fire({
         icon: "error",
         title: "Error",
@@ -360,43 +384,43 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       return;
     }
     setShowPhoneOtpInput(true);
-    // try {
-    //   const response = await axios.post(
-    //     "http://127.0.0.1:5000/user/send_phone_otp",
-    //     { phone: signupData.phone }
-    //   );
-    //   if (response.data.status === 200) {
-    //     Swal.fire({
-    //       icon: "success",
-    //       title: "OTP Sent",
-    //       text: "OTP has been sent to your phone.",
-    //       timer: 1500,
-    //       showConfirmButton: false,
-    //     });
-    //   } else {
-    //     Swal.fire({
-    //       icon: "error",
-    //       title: "Error",
-    //       text: response.data.msg,
-    //       timer: 1500,
-    //       showConfirmButton: false,
-    //     });
-    //   }
-    // } catch (error: any) {
-    //   Swal.fire({
-    //     icon: "error",
-    //     title: "Error",
-    //     text: error.response
-    //       ? error.response.data.msg
-    //       : error.message,
-    //     timer: 1500,
-    //     showConfirmButton: false,
-    //   });
-    // }
+    try {
+      const response = await axios.post(
+        "http://127.0.0.1:5000/user/sendOTP",
+        { phone: signupData.phone }
+      );
+      if (response.data.message === "OTP sent successfully") {
+        Swal.fire({
+          icon: "success",
+          title: "OTP Sent",
+          text: "OTP has been sent to your phone.",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: response.data.msg,
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      }
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.response
+          ? error.response.data.msg
+          : error.message,
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    }
   };
 
   const handleVerifyPhoneOtp = async () => {
-    if (!signupData.phoneOtp) {
+    if (!phoneOtp) {
       Swal.fire({
         icon: "error",
         title: "Error",
@@ -407,43 +431,43 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       return;
     }
     setPhoneVerified(true);
-    // try {
-    //   const response = await axios.post(
-    //     "http://127.0.0.1:5000/user/verify_phone_otp",
-    //     {
-    //       phone: signupData.phone,
-    //       otp: signupData.phoneOtp,
-    //     }
-    //   );
-    //   if (response.data.status === 200) {
-    //     setPhoneVerified(true);
-    //     Swal.fire({
-    //       icon: "success",
-    //       title: "Verified",
-    //       text: "Phone verified successfully.",
-    //       timer: 1500,
-    //       showConfirmButton: false,
-    //     });
-    //   } else {
-    //     Swal.fire({
-    //       icon: "error",
-    //       title: "Error",
-    //       text: response.data.msg,
-    //       timer: 1500,
-    //       showConfirmButton: false,
-    //     });
-    //   }
-    // } catch (error: any) {
-    //   Swal.fire({
-    //     icon: "error",
-    //     title: "Error",
-    //     text: error.response
-    //       ? error.response.data.msg
-    //       : error.message,
-    //     timer: 1500,
-    //     showConfirmButton: false,
-    //   });
-    // }
+    try {
+      const response = await axios.post(
+        "http://127.0.0.1:5000/user/verifyOTP",
+        {
+          phone: signupData.phone,
+          otp: phoneOtp,
+        }
+      );
+      if (response.data.message === "Phone verified successfully") {
+        setPhoneVerified(true);
+        Swal.fire({
+          icon: "success",
+          title: "Verified",
+          text: "Phone verified successfully.",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: response.data.msg,
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      }
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.response
+          ? error.response.data.msg
+          : error.message,
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    }
   };
 
   // Handle signup form submission (multi-step)
@@ -462,7 +486,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
           signupData,
           { headers: { "Content-Type": "application/json" } }
         );
-        if (response.data.status === 200) {
+        if (response.data.message === "User registered successfully") {
           Swal.fire({
             icon: "success",
             title: "Success",
@@ -477,10 +501,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
             setSignupData({
               name: "",
               email: "",
-              emailOtp: "",
               phone: "",
-              phoneOtp: "",
-              dateOfBirth: "",
+              dob: "",
               state: "",
               city: "",
               referralCode: "",
@@ -618,7 +640,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
           {/* Main Content */}
           <div className="p-5">
             {isLogin ? (
-              <form onSubmit={handleLoginSubmit1}>
+              <form onSubmit={handleLoginSubmit}>
                 {/* Identifier Field */}
                 <div className="mb-4">
                   <label className="block mb-1 text-black">
@@ -732,8 +754,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                             type="text"
                             name="emailOtp"
                             placeholder="Enter Email OTP"
-                            value={signupData.emailOtp}
-                            onChange={handleChange}
+                            value={emailOtp}
+                            onChange={(e) => setEmailOtp(e.target.value)}
                             disabled={emailVerified}
                             className={`w-full border border-gray-300 rounded p-2 text-gray-600 ${emailVerified ? "pr-4 cursor-not-allowed" : "pr-32"
                               }`}
@@ -826,8 +848,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                             type="text"
                             name="phoneOtp"
                             placeholder="Enter Phone OTP"
-                            value={signupData.phoneOtp}
-                            onChange={handleChange}
+                            value={phoneOtp}
+                            onChange={(e) => setPhoneOtp(e.target.value)}
                             disabled={phoneVerified}
                             className={`w-full border border-gray-300 rounded p-2 text-gray-600 ${phoneVerified ? "pr-4 cursor-not-allowed" : "pr-32"
                               }`}
@@ -844,7 +866,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                             <div className="absolute top-1/2 right-2 transform -translate-y-1/2 flex items-center space-x-1">
                               <svg
                                 className="w-5 h-5 text-green-600"
-                                fill="none"
+                                fill="none" 
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
                               >
@@ -876,13 +898,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                       </label>
                       <input
                         type="date"
-                        name="dateOfBirth"
-                        value={signupData.dateOfBirth}
+                        name="dob"
+                        value={signupData.dob}
                         onChange={handleChange}
                         className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-green-600 focus:ring-2 focus:ring-green-600 transition duration-150 ease-in-out text-gray-700"
                       />
                       {errors.dateOfBirth && (
-                        <p className="mt-1 text-xs text-red-600">{errors.dateOfBirth}</p>
+                        <p className="mt-1 text-xs text-red-600">{errors.dob}</p>
                       )}
                     </div>
 

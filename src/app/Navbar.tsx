@@ -9,7 +9,12 @@ interface User {
   profileImage: string;
 }
 
-const Navbar: React.FC = () => {
+interface NavbarProps {
+  walletBalance: number;
+}
+
+
+const Navbar: React.FC<NavbarProps> = ({ walletBalance }) => {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -115,8 +120,7 @@ const Navbar: React.FC = () => {
                   className="w-8 h-8 rounded-full mr-2"
                 />
                 <span className="text-gray-700 text-sm font-medium">
-                  {user.name}
-                  {" "} | {"₹  0"}
+                {user.name} | ₹ {walletBalance}
                 </span>
               </button>
 
