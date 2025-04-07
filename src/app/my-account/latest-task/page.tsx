@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Lexend } from "next/font/google";
 import TaskUploadModal from "./screenshotModal";
 import { FaLock } from "react-icons/fa";
+import Swal from "sweetalert2";
 
 const lexend = Lexend({
   subsets: ["latin"],
@@ -15,8 +16,8 @@ interface Task {
   title: string;
   description: string;
   message: string;
-  // You can still keep the status property if needed, but it's not used in this level system.
-  status?: "pending" | "completed";
+  status: "unlocked" | "locked" | "done";
+  // Additional properties from the response can be added if needed.
 }
 
 export default function LatestTaskPage() {
@@ -30,14 +31,28 @@ export default function LatestTaskPage() {
   useEffect(() => {
     async function fetchTasks() {
       try {
+        const storedUser = localStorage.getItem("user");
+        if (!storedUser) {
+          console.error("User object not found in localStorage");
+          return;
+        }
+        const user = JSON.parse(storedUser);
+        if (!user.userId) {
+          console.error("userId not found in user object");
+          return;
+        }
         setLoading(true);
-        const response = await fetch("http://127.0.0.1:5000/task/newtask");
+        const response = await fetch("http://127.0.0.1:5000/task/latestTask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.userId }),
+        });
         const data = await response.json();
-        // If your API returns an array of tasks, adjust accordingly.
-        if (data.task) {
-          // Wrap single object in an array or use data.tasks if available.
-          setTasks(Array.isArray(data.task) ? data.task : [data.task]);
+        if (data.tasks) {
+          // Assume the tasks come with valid status values ("unlocked", "locked", "done")
+          setTasks(data.tasks);
         } else {
+          console.log(data.message); // "Task will upload soon..." or "Task hidden" message from the backend.
           setTasks([]);
         }
       } catch (err) {
@@ -46,15 +61,21 @@ export default function LatestTaskPage() {
         setLoading(false);
       }
     }
-
+  
     if (isLoggedIn) fetchTasks();
   }, [isLoggedIn]);
 
   const handleCopyMessage = (message: string) => {
     navigator.clipboard.writeText(message);
-    alert("Message copied to clipboard!");
+    Swal.fire({
+      title: "Copied!",
+      text: "Message copied to clipboard.",
+      icon: "success",
+      timer: 1500,
+      showConfirmButton: false,
+    });
   };
-
+  
   const handleSendWhatsApp = (message: string) => {
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
@@ -67,37 +88,52 @@ export default function LatestTaskPage() {
 
   const handleCloseUploadModal = () => {
     setShowModal(false);
+    // Mark the task as done when modal closes
+    if (selectedTaskId) {
+      setTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          task.taskId === selectedTaskId ? { ...task, status: "done" } : task
+        )
+      );
+    }
     setSelectedTaskId(null);
   };
 
-  // Only the first card (index 0) is unlocked; all others are locked.
-  const renderTaskCard = (task: Task, index: number) => {
-    const isLocked = index !== 0;
+  // Render each task card using the server-provided status values.
+  const renderTaskCard = (task: Task) => {
+    const isLocked = task.status === "locked";
+    const isDone = task.status === "done";
+    const isUnlocked = task.status === "unlocked";
+
+    // Set badge classes based on status.
+    const badgeClasses =
+      isLocked ? "bg-red-500 text-white" : isDone ? "bg-blue-500 text-white" : "bg-green-500 text-white";
 
     return (
       <div
         key={task.taskId}
         className={`relative bg-white dark:bg-zinc-900 border border-green-200 dark:border-green-700 p-8 rounded-2xl shadow-xl transition hover:shadow-2xl ${lexend.className} ${
-          isLocked ? "opacity-50 pointer-events-none filter blur-sm" : ""
+          isLocked ? "filter blur-sm" : ""
         }`}
       >
-        {/* Lock overlay for locked cards */}
+        {/* Lock overlay for locked tasks */}
         {isLocked && (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <button
+            onClick={() =>
+              alert("This task is locked. Complete previous tasks to unlock it.")
+            }
+            className="absolute inset-0 flex items-center justify-center z-10"
+          >
             <FaLock className="text-4xl text-gray-500" />
-          </div>
+          </button>
         )}
 
         <div className="flex justify-between items-center mb-4">
-          <h3 className={`text-3xl font-bold text-green-800 dark:text-green-100`}>
+          <h3 className="text-3xl font-bold text-green-800 dark:text-green-100">
             {task.title}
           </h3>
-          <span
-            className={`px-3 py-1 rounded-full text-sm font-semibold ${
-              isLocked ? "bg-red-500 text-white" : "bg-green-500 text-white"
-            }`}
-          >
-            {isLocked ? "Locked" : "Unlocked"}
+          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${badgeClasses}`}>
+            {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
           </span>
         </div>
 
@@ -114,8 +150,8 @@ export default function LatestTaskPage() {
           {task.message}
         </a>
 
-        {/* Interactive buttons are only rendered if the task is unlocked */}
-        {!isLocked && (
+        {/* Render interactive buttons only if the task is unlocked */}
+        {isUnlocked && (
           <>
             <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4 mb-6">
               <button
@@ -158,17 +194,27 @@ export default function LatestTaskPage() {
   };
 
   return (
-    <div className="p-8">
-      <h1 className="text-4xl font-bold mb-8">Latest Task</h1>
-      {loading ? (
-        <p>Loading tasks...</p>
-      ) : tasks.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {tasks.map((task, index) => renderTaskCard(task, index))}
-        </div>
-      ) : (
-        <p>No tasks available.</p>
-      )}
+    <div className="p-8 bg-green-50 min-h-screen">
+      <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-xl border border-green-200 dark:border-green-700 p-6">
+        <h1 className="text-4xl font-bold mb-8">Latest Task</h1>
+        {loading ? (
+          <p className="text-center">Loading tasks...</p>
+        ) : tasks.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {tasks.map((task) => renderTaskCard(task))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-10">
+            <span className="text-6xl mb-4">📝</span>
+            <p className="text-lg text-gray-700 dark:text-gray-300">
+              No tasks available.
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Please check back later for new tasks.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

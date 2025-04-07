@@ -1,88 +1,49 @@
 "use client";
 
-import React, { useState, FormEvent, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, FormEvent } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import Swal from "sweetalert2";
-import AdminCredentialsModal from "./adminModal";
 
-interface Settings {
-  siteTitle: string;
-  siteDescription: string;
-  contactEmail: string;
-  maintenanceMode: number; // 0 or 1
-}
-
-const AdminSettingsPage: React.FC = () => {
-  const [settings, setSettings] = useState<Settings>({
-    siteTitle: "",
-    siteDescription: "",
-    contactEmail: "",
-    maintenanceMode: 0,
-  });
-  const [loading, setLoading] = useState<boolean>(false);
-  const [saving, setSaving] = useState<boolean>(false);
+export default function Page() {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [credentialsModalOpen, setCredentialsModalOpen] = useState<boolean>(false);
-
-  useEffect(() => {
-    const fetchSettings = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch("http://127.0.0.1:5000/admin/settings", {
-          method: "GET",
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error || "Failed to load settings.");
-        }
-        setSettings({
-          siteTitle: data.siteTitle || "",
-          siteDescription: data.siteDescription || "",
-          contactEmail: data.contactEmail || "",
-          maintenanceMode: data.maintenanceMode || 0,
-        });
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSettings();
-  }, []);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setSettings({
-      ...settings,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const toggleMaintenanceMode = () => {
-    setSettings((prev) => ({
-      ...prev,
-      maintenanceMode: prev.maintenanceMode ? 0 : 1,
-    }));
-  };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("http://127.0.0.1:5000/admin/settings", {
+      const res = await fetch("http://127.0.0.1:5000/admin/update_credentials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify({ email, newPassword }),
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to save settings.");
+        throw new Error(data.error || "Failed to update credentials");
       }
-      Swal.fire("Success", "Settings updated successfully.", "success");
+      Swal.fire("Success", "Login credentials updated successfully", "success");
+      setOpen(false);
+      setEmail("");
+      setNewPassword("");
+      setConfirmPassword("");
     } catch (err: any) {
       setError(err.message);
       Swal.fire("Error", err.message, "error");
@@ -91,114 +52,75 @@ const AdminSettingsPage: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-lg font-medium">Loading settings...</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-6">
-      <Card className="shadow-lg mb-6">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-green-700">Admin Settings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {error && <p className="text-red-500 mb-4">{error}</p>}
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Admin Update Credentials</h1>
+      <Button onClick={() => setOpen(true)}>Update Login Credentials</Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="w-full max-w-md p-4 bg-white rounded-lg shadow-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">
+              Update Login Credentials
+            </DialogTitle>
+          </DialogHeader>
+          {error && <p className="text-red-500 mb-2">{error}</p>}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Site Title */}
             <div>
-              <Label htmlFor="siteTitle" className="block text-sm font-medium text-gray-700">
-                Site Title
+              <Label htmlFor="admin-email" className="block text-sm font-medium text-gray-700">
+                Email
               </Label>
               <Input
-                id="siteTitle"
-                name="siteTitle"
-                type="text"
-                value={settings.siteTitle}
-                onChange={handleInputChange}
-                required
-                className="mt-1"
-              />
-            </div>
-            {/* Site Description */}
-            <div>
-              <Label htmlFor="siteDescription" className="block text-sm font-medium text-gray-700">
-                Site Description
-              </Label>
-              <textarea
-                id="siteDescription"
-                name="siteDescription"
-                value={settings.siteDescription}
-                onChange={handleInputChange}
-                className="mt-1 w-full border rounded p-2"
-                rows={3}
-              />
-            </div>
-            {/* Contact Email */}
-            <div>
-              <Label htmlFor="contactEmail" className="block text-sm font-medium text-gray-700">
-                Contact Email
-              </Label>
-              <Input
-                id="contactEmail"
-                name="contactEmail"
+                id="admin-email"
                 type="email"
-                value={settings.contactEmail}
-                onChange={handleInputChange}
+                name="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 className="mt-1"
               />
             </div>
-            {/* Maintenance Mode Toggle */}
-            <div className="flex items-center space-x-3">
-              <Label htmlFor="maintenanceMode" className="block text-sm font-medium text-gray-700">
-                Maintenance Mode
+            <div>
+              <Label htmlFor="new-password" className="block text-sm font-medium text-gray-700">
+                New Password
               </Label>
-              <div
-                onClick={toggleMaintenanceMode}
-                className={`relative inline-block w-10 h-6 rounded-full transition-colors duration-200 ease-in-out cursor-pointer ${
-                  settings.maintenanceMode ? "bg-red-600" : "bg-gray-300"
-                }`}
-              >
-                <span
-                  className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-in-out ${
-                    settings.maintenanceMode ? "translate-x-4" : ""
-                  }`}
-                ></span>
-                <input
-                  id="maintenanceMode"
-                  type="checkbox"
-                  name="maintenanceMode"
-                  checked={Boolean(settings.maintenanceMode)}
-                  onChange={() => {}}
-                  className="opacity-0 absolute w-full h-full cursor-pointer"
-                />
-              </div>
-              <span className="text-sm">
-                {settings.maintenanceMode ? "Enabled" : "Disabled"}
-              </span>
+              <Input
+                id="new-password"
+                type="password"
+                name="newPassword"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                className="mt-1"
+              />
             </div>
-            {/* Form Actions */}
-            <div className="flex justify-end space-x-4">
-              <Button type="submit" disabled={saving} className="bg-green-600 text-white hover:bg-green-700">
-                {saving ? "Saving..." : "Save Settings"}
+            <div>
+              <Label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700">
+                Confirm Password
+              </Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                name="confirmPassword"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                className="mt-1"
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <DialogClose asChild>
+                <Button variant="outline" disabled={saving}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Updating..." : "Update"}
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
-      {/* Credentials Modal */}
-      <AdminCredentialsModal open={credentialsModalOpen} setOpen={setCredentialsModalOpen} />
-      <div className="flex justify-end">
-        <Button onClick={() => setCredentialsModalOpen(true)} variant="outline">
-          Update Login Credentials
-        </Button>
-      </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-};
-
-export default AdminSettingsPage;
+}

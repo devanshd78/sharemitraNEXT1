@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, ChangeEvent } from "react";
 import Swal from "sweetalert2";
+import axios from "axios";
 
 interface ProfileType {
   userId: string;
@@ -13,9 +14,19 @@ interface ProfileType {
   city?: string;
   referralCode?: string;
   totalPayoutAmount?: number;
-  // createdAt and updatedAt can be added if you wish to display them
   createdAt?: string;
   updatedAt?: string;
+}
+
+interface CityOption {
+  value: string; // cityId
+  label: string; // city name
+}
+
+interface StateOption {
+  value: string; // stateId
+  label: string; // state name
+  cities: CityOption[];
 }
 
 const Profile: React.FC = () => {
@@ -32,7 +43,33 @@ const Profile: React.FC = () => {
     referralCode: "",
     totalPayoutAmount: 0,
   });
+  const [originalProfile, setOriginalProfile] = useState<ProfileType | null>(null);
+  const [emailVerified, setEmailVerified] = useState(true);
+  const [phoneVerified, setPhoneVerified] = useState(true);
+  const [stateOptions, setStateOptions] = useState<StateOption[]>([]);
+  const [cityOptions, setCityOptions] = useState<CityOption[]>([]);
 
+  // Fetch state options for the select inputs
+  useEffect(() => {
+    axios
+      .get("http://127.0.0.1:5000/contact/india_states")
+      .then((res) => {
+        if (res.data && res.data.states) {
+          const options: StateOption[] = res.data.states.map((state: any) => ({
+            value: state.stateId, // Use stateId
+            label: state.state,   // Use state name
+            cities: state.cities.map((city: any) => ({
+              value: city.cityId, // Use cityId
+              label: city.name,   // City name
+            })) || [],
+          }));
+          setStateOptions(options);
+        }
+      })
+      .catch((err) => console.error("Error fetching state options:", err));
+  }, []);
+
+  // Fetch user profile
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -47,7 +84,7 @@ const Profile: React.FC = () => {
       const data = await res.json();
       if (res.ok) {
         setProfile(data);
-        // Store the entire user object in localStorage
+        setOriginalProfile(data);
         localStorage.setItem("user", JSON.stringify(data));
       } else {
         showError(data.error || "Failed to fetch profile.");
@@ -58,30 +95,71 @@ const Profile: React.FC = () => {
       setLoading(false);
     }
   };
-  
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Update city options when profile.state or stateOptions changes
+  useEffect(() => {
+    if (profile.state && stateOptions.length > 0) {
+      const matchedState = stateOptions.find((s) => s.value === profile.state);
+      if (matchedState) {
+        setCityOptions(matchedState.cities);
+      } else {
+        setCityOptions([]);
+      }
+    }
+  }, [profile.state, stateOptions]);
+
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    // For phone number, allow only digits
     const processedValue = name === "phone" ? value.replace(/\D/g, "") : value;
     setProfile((prev) => ({ ...prev, [name]: processedValue }));
+    
+    if (name === "email" && originalProfile && value !== originalProfile.email) {
+      setEmailVerified(false);
+    }
+    if (name === "phone" && originalProfile && value !== originalProfile.phone) {
+      setPhoneVerified(false);
+    }
+    if (name === "state") {
+      // Update city options based on selected state
+      const selectedState = stateOptions.find((s) => s.value === value);
+      if (selectedState) {
+        setCityOptions(selectedState.cities);
+      } else {
+        setCityOptions([]);
+      }
+      setProfile((prev) => ({ ...prev, city: "" }));
+    }
   };
 
   const handleSave = async () => {
-    // Validate phone number length
     if (profile.phone.length !== 10) {
       return showError("Phone number must be exactly 10 digits.");
     }
+    if (
+      originalProfile &&
+      profile.email !== originalProfile.email &&
+      !emailVerified
+    ) {
+      return showError("Please verify your new email before updating details.");
+    }
+    if (
+      originalProfile &&
+      profile.phone !== originalProfile.phone &&
+      !phoneVerified
+    ) {
+      return showError("Please verify your new phone before updating details.");
+    }
     try {
-      const res = await fetch("http://localhost:5000/user/updatedetails", {
+      const res = await fetch("http://localhost:5000/user/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(profile),
       });
       const data = await res.json();
-      if (data.status === 200) {
+      if (data.message === "User details updated.") {
         localStorage.setItem("user", JSON.stringify(profile));
         setIsEditing(false);
+        setOriginalProfile(profile);
         Swal.fire("Updated!", "Profile updated successfully.", "success");
       } else {
         showError(data.msg);
@@ -91,14 +169,101 @@ const Profile: React.FC = () => {
     }
   };
 
+  const handleCancel = () => {
+    if (originalProfile) {
+      setProfile(originalProfile);
+      setEmailVerified(profile.email === originalProfile.email);
+      setPhoneVerified(profile.phone === originalProfile.phone);
+    }
+    setIsEditing(false);
+  };
+
   const showError = (msg: string) => {
     Swal.fire("Error", msg, "error");
   };
 
   const inputClass = (active: boolean) =>
     `w-full px-4 py-3 rounded-md border transition focus:outline-none focus:ring-2 ring-green-400
-     ${active ? "bg-white dark:bg-zinc-800 border-gray-300" : "bg-gray-100 dark:bg-zinc-900 cursor-not-allowed"}
-     text-gray-800 dark:text-white`;
+    ${active ? "bg-white dark:bg-zinc-800 border-gray-300" : "bg-gray-100 dark:bg-zinc-900 cursor-not-allowed"}
+    text-gray-800 dark:text-white`;
+
+  // Verify email using SweetAlert2 modal
+  const handleVerifyEmail = async () => {
+    try {
+      const sendRes = await fetch("http://localhost:5000/user/send_email_otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: profile.email }),
+      });
+      const sendData = await sendRes.json();
+      if (!sendRes.ok) {
+        return showError(sendData.error || "Failed to send email OTP.");
+      }
+      const { value: otp } = await Swal.fire({
+        title: "Enter Email OTP",
+        input: "text",
+        inputPlaceholder: "Enter OTP",
+        showCancelButton: true,
+      });
+      if (otp) {
+        const verifyRes = await fetch("http://localhost:5000/user/verify_email_otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: profile.email, otp }),
+        });
+        const verifyData = await verifyRes.json();
+        if (verifyRes.ok) {
+          Swal.fire("Verified!", "Email verified successfully.", "success");
+          setEmailVerified(true);
+        } else {
+          showError(verifyData.error || "Email verification failed.");
+        }
+      }
+    } catch (error) {
+      showError("Error verifying email.");
+    }
+  };
+
+  // Verify phone using SweetAlert2 modal
+  const handleVerifyPhone = async () => {
+    try {
+      const sendRes = await fetch("http://localhost:5000/user/send_phone_otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: profile.phone }),
+      });
+      const sendData = await sendRes.json();
+      if (!sendRes.ok) {
+        return showError(sendData.error || "Failed to send phone OTP.");
+      }
+      const { value: otp } = await Swal.fire({
+        title: "Enter Phone OTP",
+        input: "text",
+        inputPlaceholder: "Enter OTP",
+        showCancelButton: true,
+      });
+      if (otp) {
+        const verifyRes = await fetch("http://localhost:5000/user/verify_phone_otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: profile.phone, otp }),
+        });
+        const verifyData = await verifyRes.json();
+        if (verifyRes.ok) {
+          Swal.fire("Verified!", "Phone verified successfully.", "success");
+          setPhoneVerified(true);
+        } else {
+          showError(verifyData.error || "Phone verification failed.");
+        }
+      }
+    } catch (error) {
+      showError("Error verifying phone.");
+    }
+  };
+
+  // For non-edit mode, display state and city as "ID (Name)"
+  const stateOption = stateOptions.find((s) => s.value === profile.state);
+  const cityOption = cityOptions.find((c) => c.value === profile.city);
 
   if (loading) {
     return (
@@ -110,31 +275,25 @@ const Profile: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-green-50 dark:bg-zinc-950 p-6">
-      <div className="max-w-xl mx-auto bg-white dark:bg-zinc-900 rounded-3xl shadow-lg border border-green-200 dark:border-green-700 p-8 md:p-10">
+      <div className="max-w-4xl mx-auto bg-white dark:bg-zinc-900 rounded-3xl shadow-lg border border-green-200 dark:border-green-700 p-8 md:p-10">
         <h2 className="text-4xl font-bold text-center mb-10 text-green-800 dark:text-green-200">
           Profile Settings
         </h2>
-
-        <div className="space-y-6">
-          {["name", "email", "phone"].map((field) => (
-            <div key={field}>
-              <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
-                {field === "phone" ? "Phone Number" : field}
-              </label>
-              <input
-                type={field === "email" ? "email" : "text"}
-                name={field}
-                value={(profile as any)[field]}
-                onChange={handleChange}
-                disabled={!isEditing}
-                minLength={field === "phone" ? 10 : undefined}
-                maxLength={field === "phone" ? 10 : undefined}
-                className={inputClass(isEditing)}
-              />
-            </div>
-          ))}
-
-          {/* Date of Birth */}
+        {/* Row 1: Name & DOB */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Name
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={profile.name}
+              onChange={handleChange}
+              disabled={!isEditing}
+              className={inputClass(isEditing)}
+            />
+          </div>
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
               Date of Birth
@@ -148,90 +307,135 @@ const Profile: React.FC = () => {
               className={inputClass(isEditing)}
             />
           </div>
-
-          {/* State */}
+        </div>
+        {/* Row 2: Email & Phone */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Email
+            </label>
+            <div className="flex items-center space-x-2">
+              <input
+                type="email"
+                name="email"
+                value={profile.email}
+                onChange={handleChange}
+                disabled={!isEditing}
+                className={inputClass(isEditing)}
+              />
+              {isEditing && profile.email !== originalProfile?.email && !emailVerified && (
+                <button
+                  onClick={handleVerifyEmail}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-md"
+                >
+                  Verify
+                </button>
+              )}
+            </div>
+          </div>
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Phone Number
+            </label>
+            <div className="flex items-center space-x-2">
+              <input
+                type="text"
+                name="phone"
+                value={profile.phone}
+                onChange={handleChange}
+                disabled={!isEditing}
+                minLength={10}
+                maxLength={10}
+                className={inputClass(isEditing)}
+              />
+              {isEditing && profile.phone !== originalProfile?.phone && !phoneVerified && (
+                <button
+                  onClick={handleVerifyPhone}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-md"
+                >
+                  Verify
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        {/* Row 3: State & City */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
               State
             </label>
-            <input
-              type="text"
-              name="state"
-              value={profile.state || ""}
-              onChange={handleChange}
-              disabled={!isEditing}
-              className={inputClass(isEditing)}
-            />
+            {isEditing ? (
+              <select
+                name="state"
+                value={profile.state || ""}
+                onChange={handleChange}
+                className={inputClass(isEditing)}
+              >
+                <option value="">Select State</option>
+                {stateOptions.map((state) => (
+                  <option key={state.value} value={state.value}>
+                    {state.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className={inputClass(false)}>
+                {stateOption ? `${stateOption.label}` : ""}
+              </div>
+            )}
           </div>
-
-          {/* City */}
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
               City
             </label>
-            <input
-              type="text"
-              name="city"
-              value={profile.city || ""}
-              onChange={handleChange}
-              disabled={!isEditing}
-              className={inputClass(isEditing)}
-            />
-          </div>
-
-          {/* Referral Code (read-only) */}
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-              Referral Code
-            </label>
-            <input
-              type="text"
-              name="referralCode"
-              value={profile.referralCode || ""}
-              disabled
-              className={inputClass(false)}
-            />
-          </div>
-
-          {/* Total Payout Amount (read-only) */}
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-              Total Payout Amount
-            </label>
-            <input
-              type="number"
-              name="totalPayoutAmount"
-              value={profile.totalPayoutAmount || 0}
-              disabled
-              className={inputClass(false)}
-            />
-          </div>
-
-          <div className="flex justify-between mt-8">
             {isEditing ? (
-              <>
-                <button
-                  onClick={handleSave}
-                  className="w-full mr-2 py-3 rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 transition"
-                >
-                  ✅ Save Changes
-                </button>
-                <button
-                  onClick={() => setIsEditing(false)}
-                  className="w-full ml-2 py-3 rounded-md bg-red-600 text-white font-semibold hover:bg-red-700 transition"
-                >
-                  ❌ Cancel
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="w-full py-3 rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 transition"
+              <select
+                name="city"
+                value={profile.city || ""}
+                onChange={handleChange}
+                disabled={!profile.state}
+                className={inputClass(isEditing)}
               >
-                ✏️ Edit Profile
-              </button>
+                <option value="">{profile.state ? "Select City" : "Select State first"}</option>
+                {cityOptions.map((city) => (
+                  <option key={city.value} value={city.value}>
+                    {city.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className={inputClass(false)}>
+                {cityOption ? `${cityOption.label}` : ""}
+              </div>
             )}
           </div>
+        </div>
+        {/* Action Buttons */}
+        <div className="flex justify-between mt-8">
+          {isEditing ? (
+            <>
+              <button
+                onClick={handleSave}
+                className="w-full mr-2 py-3 rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 transition"
+              >
+                ✅ Save Changes
+              </button>
+              <button
+                onClick={handleCancel}
+                className="w-full ml-2 py-3 rounded-md bg-red-600 text-white font-semibold hover:bg-red-700 transition"
+              >
+                ❌ Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="w-full py-3 rounded-md bg-green-600 text-white font-semibold hover:bg-green-700 transition"
+            >
+              ✏️ Edit Profile
+            </button>
+          )}
         </div>
       </div>
     </div>

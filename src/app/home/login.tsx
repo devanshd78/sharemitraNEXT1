@@ -24,10 +24,15 @@ interface Errors {
   [key: string]: string;
 }
 
+interface City {
+  cityId: string;
+  name: string;
+}
+
 interface StateOption {
   value: string;
   label: string;
-  cities: string[];
+  cities: City[];
 }
 
 export interface LoginModalProps {
@@ -64,7 +69,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
   const [isVerifyingEmailOtp, setIsVerifyingEmailOtp] = useState(false);
   const [showPhoneOtpInput, setShowPhoneOtpInput] = useState(false);
   const [stateOptions, setStateOptions] = useState<StateOption[]>([]);
-  const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [cityOptions, setCityOptions] = useState<City[]>([]);
   const [emailOtp, setEmailOtp] = useState("");
   const [phoneOtp, setPhoneOtp] = useState("");
 
@@ -76,8 +81,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       .then((res) => {
         if (res.data && res.data.states) {
           const options: StateOption[] = res.data.states.map((state: any) => ({
-            value: state.name,
-            label: state.name,
+            value: state.stateId,   // using stateId as the option value
+            label: state.state,     // using state name as the label
             cities: state.cities || [],
           }));
           setStateOptions(options);
@@ -141,7 +146,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
   const handleLoginSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!validateLogin()) return;
-  
+
     // If OTP hasn't been sent yet, send OTP based on identifier type.
     if (!loginOtpSent) {
       try {
@@ -640,7 +645,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
           {/* Main Content */}
           <div className="p-5">
             {isLogin ? (
-              <form onSubmit={handleLoginSubmit}>
+              <form onSubmit={handleLoginSubmit1}>
                 {/* Identifier Field */}
                 <div className="mb-4">
                   <label className="block mb-1 text-black">
@@ -866,7 +871,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                             <div className="absolute top-1/2 right-2 transform -translate-y-1/2 flex items-center space-x-1">
                               <svg
                                 className="w-5 h-5 text-green-600"
-                                fill="none" 
+                                fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
                               >
@@ -915,13 +920,11 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                       </label>
                       <select
                         value={signupData.state}
-                        onChange={(e) => {
+                        onChange={(e: ChangeEvent<HTMLSelectElement>) => {
                           const selectedValue = e.target.value;
                           setSignupData((prev) => ({ ...prev, state: selectedValue, city: "" }));
                           // Update city options for the selected state.
-                          const selectedState = stateOptions.find(
-                            (s) => s.value === selectedValue
-                          );
+                          const selectedState = stateOptions.find((s) => s.value === selectedValue);
                           if (selectedState) {
                             setCityOptions(selectedState.cities);
                           } else {
@@ -949,7 +952,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                       </label>
                       <select
                         value={signupData.city}
-                        onChange={(e) =>
+                        onChange={(e: ChangeEvent<HTMLSelectElement>) =>
                           setSignupData((prev) => ({ ...prev, city: e.target.value }))
                         }
                         disabled={cityOptions.length === 0 || !signupData.state}
@@ -958,9 +961,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                         <option value="">
                           {cityOptions.length === 0 ? "Select a state first" : "Select city"}
                         </option>
-                        {cityOptions.map((city, index) => (
-                          <option key={index} value={city}>
-                            {city}
+                        {cityOptions.map((city) => (
+                          <option key={city.cityId} value={city.cityId}>
+                            {city.name}
                           </option>
                         ))}
                       </select>
@@ -968,6 +971,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                         <p className="mt-1 text-xs text-red-600">{errors.city}</p>
                       )}
                     </div>
+
                     <div className="mb-6">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Referral Code

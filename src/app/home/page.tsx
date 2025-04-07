@@ -96,12 +96,31 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     async function fetchTasks() {
       try {
+        const storedUser = localStorage.getItem("user");
+        if (!storedUser) {
+          console.error("User object not found in localStorage");
+          return;
+        }
+        const user = JSON.parse(storedUser);
+        if (!user.userId) {
+          console.error("userId not found in user object");
+          return;
+        }
         setLoading(true);
-        const response = await fetch("http://127.0.0.1:5000/task/newtask");
+        const response = await fetch("http://127.0.0.1:5000/task/newtask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.userId }),
+        });
         const data = await response.json();
+        // Ensure tasks have a status property; default to "pending"
         if (data.task) {
-          setTasks([data.task]); // Wrap single object in an array
+          const fetchedTasks = Array.isArray(data.task)
+            ? data.task.map((task: Task) => ({ ...task, status: task.status || "pending" }))
+            : [{ ...data.task, status: data.task.status || "pending" }];
+          setTasks(fetchedTasks);
         } else {
+          console.log(data.message); // "Task will upload soon..." or "Task hidden" message from the backend.
           setTasks([]);
         }
       } catch (err) {

@@ -70,7 +70,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { name: "Users", href: "/advertiser/users", icon: <FiUser /> },
     { name: "Tasks", href: "/advertiser/tasks", icon: <FiCheckSquare /> },
     { name: "Payout", href: "/advertiser/payout", icon: <FaRupeeSign /> },
-    { name: "Settings", href: "/advertiser/settings", icon: <FiSettings /> },
+    { name: "Update Login Credential", href: "/advertiser/settings", icon: <FiSettings /> },
   ];
 
   const handleLogout = () => {

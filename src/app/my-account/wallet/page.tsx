@@ -29,8 +29,8 @@ interface WalletData {
 
 const WalletPage = () => {
   const [walletData, setWalletData] = useState<WalletData>({
-    totalEarned: 500,
-    availableToWithdraw: 500,
+    totalEarned: 0,
+    availableToWithdraw: 0,
   });
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
@@ -61,8 +61,8 @@ const WalletPage = () => {
       if (response.ok) {
         // Assuming your API returns fields "total_earning" and "remaining_balance"
         setWalletData({
-          totalEarned: data.total_earning || 500,
-          availableToWithdraw: data.remaining_balance || 500,
+          totalEarned: data.total_earning || 0,
+          availableToWithdraw: data.remaining_balance || 0,
         });
       } else {
         console.error("Error fetching wallet info:", data.error);
@@ -72,12 +72,13 @@ const WalletPage = () => {
     }
   };
 
-  // Fetch payment methods from the API.
   const fetchPaymentMethods = async (userId: string) => {
     try {
-      const response = await fetch(
-        `http://127.0.0.1:5000/payment/payment-details/user/${userId}`
-      );
+      const response = await fetch("http://127.0.0.1:5000/payment/userdetail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
       const data = await response.json();
       if (data.status === 200) {
         setPaymentMethods(data.payments);
@@ -88,7 +89,6 @@ const WalletPage = () => {
       console.error("Error fetching payment methods:", err);
     }
   };
-
   const handleWithdrawConfirm = async () => {
     const amount = parseInt(withdrawAmount);
 

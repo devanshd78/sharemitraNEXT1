@@ -64,7 +64,7 @@ export default function MyAccountLayout({ children }: { children: React.ReactNod
           <div className="flex items-center">
             <Image
               src="/logo.jpeg"
-              alt="Logo"
+              alt="Lwe"
               width={40}
               height={40}
               className="rounded-full cursor-pointer"
@@ -88,13 +88,12 @@ export default function MyAccountLayout({ children }: { children: React.ReactNod
               key={item.name}
               href={item.path}
               onClick={() => setActivePath(item.path)}
-              className={`flex items-center w-full p-3 rounded-lg transition duration-200 ease-in-out ${
-                activePath === item.path
+              className={`flex items-center w-full p-3 rounded-lg transition duration-200 ease-in-out ${activePath === item.path
                   ? "bg-green-800"
                   : item.highlight
-                  ? "bg-gradient-to-r from-blue-600 to-green-800 transform hover:scale-105 mb-4"
-                  : "hover:bg-green-700"
-              }`}
+                    ? "bg-gradient-to-r from-blue-600 to-green-800 transform hover:scale-105 mb-4"
+                    : "hover:bg-green-700"
+                }`}
             >
               <span className="text-xl">{item.icon}</span>
               {!isCollapsed && <span className="ml-3">{item.name}</span>}

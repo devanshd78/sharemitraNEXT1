@@ -20,7 +20,7 @@ const ReferEarn: React.FC = () => {
   
     const fetchReferralData = async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:5000/user/referral?userId=${userId}`);
+        const res = await fetch(`http://127.0.0.1:5000/user/referrals?userId=${userId}`);
         const data = await res.json();
   
         if (data?.referralCode) setReferralCode(data.referralCode);

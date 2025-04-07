@@ -123,37 +123,51 @@ const PaymentStatus: React.FC = () => {
                 <span className="text-xl font-bold">₹ {payoutData.total_payout_amount}</span>
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm sm:text-base">
-                <thead className="bg-green-200 dark:bg-green-700 text-green-800 dark:text-green-100 uppercase tracking-wide">
-                  <tr>
-                    <th className="px-4 sm:px-6 py-3 border-b">No.</th>
-                    <th className="px-4 sm:px-6 py-3 border-b">Payout ID</th>
-                    <th className="px-4 sm:px-6 py-3 border-b">Amount</th>
-                    <th className="px-4 sm:px-6 py-3 border-b">Mode</th>
-                    <th className="px-4 sm:px-6 py-3 border-b">Status</th>
-                    <th className="px-4 sm:px-6 py-3 border-b">Withdraw Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payoutData.payouts.map((payout, idx) => (
-                    <tr
-                      key={payout.payout_id}
-                      className={`${idx % 2 === 0 ? "bg-white dark:bg-zinc-800" : "bg-green-50 dark:bg-zinc-700"} hover:bg-green-100 dark:hover:bg-zinc-600 transition`}
-                    >
-                      <td className="px-4 sm:px-6 py-4 border-b font-medium">{idx + 1}</td>
-                      <td className="px-4 sm:px-6 py-4 border-b">{payout.payout_id}</td>
-                      <td className="px-4 sm:px-6 py-4 border-b">₹ {payout.amount}</td>
-                      <td className="px-4 sm:px-6 py-4 border-b">{payout.mode}</td>
-                      <td className="px-4 sm:px-6 py-4 border-b">{getStatusBadge(payout.status)}</td>
-                      <td className="px-4 sm:px-6 py-4 border-b whitespace-nowrap">
-                        {new Date(payout.withdraw_time).toLocaleString()}
-                      </td>
+            {payoutData.payouts.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm sm:text-base">
+                  <thead className="bg-green-200 dark:bg-green-700 text-green-800 dark:text-green-100 uppercase tracking-wide">
+                    <tr>
+                      <th className="px-4 sm:px-6 py-3 border-b">No.</th>
+                      <th className="px-4 sm:px-6 py-3 border-b">Payout ID</th>
+                      <th className="px-4 sm:px-6 py-3 border-b">Amount</th>
+                      <th className="px-4 sm:px-6 py-3 border-b">Mode</th>
+                      <th className="px-4 sm:px-6 py-3 border-b">Status</th>
+                      <th className="px-4 sm:px-6 py-3 border-b">Withdraw Time</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {payoutData.payouts.map((payout, idx) => (
+                      <tr
+                        key={payout.payout_id}
+                        className={`${
+                          idx % 2 === 0 ? "bg-white dark:bg-zinc-800" : "bg-green-50 dark:bg-zinc-700"
+                        } hover:bg-green-100 dark:hover:bg-zinc-600 transition`}
+                      >
+                        <td className="px-4 sm:px-6 py-4 border-b font-medium">{idx + 1}</td>
+                        <td className="px-4 sm:px-6 py-4 border-b">{payout.payout_id}</td>
+                        <td className="px-4 sm:px-6 py-4 border-b">₹ {payout.amount}</td>
+                        <td className="px-4 sm:px-6 py-4 border-b">{payout.mode}</td>
+                        <td className="px-4 sm:px-6 py-4 border-b">{getStatusBadge(payout.status)}</td>
+                        <td className="px-4 sm:px-6 py-4 border-b whitespace-nowrap">
+                          {new Date(payout.withdraw_time).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10">
+                <span className="text-6xl mb-4">💰</span>
+                <p className="text-lg text-gray-700 dark:text-gray-300">
+                  No payout details available!
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Your payouts will be displayed here once processed.
+                </p>
+              </div>
+            )}
           </>
         ) : null}
       </div>

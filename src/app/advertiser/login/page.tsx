@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Swal from "sweetalert2";
+import axios from "axios";
 
-const AdminLogin = () => {
+const AdminLogin: React.FC = () => {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // Set mounted to true to avoid SSR issues
+  // Set mounted to true to avoid SSR issues and check if user is already logged in
   useEffect(() => {
     setIsMounted(true);
     if (typeof window !== "undefined") {
@@ -18,19 +20,41 @@ const AdminLogin = () => {
       if (user && user.role === "admin") {
         router.replace("/advertiser/dashboard");
       }
+      
     }
   }, [router]);
 
   if (!isMounted) return null;
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock authentication check
-    if (email === "admin@example.com" && password === "admin123") {
-      localStorage.setItem("user", JSON.stringify({ role: "admin" }));
-      router.replace("/advertiser/dashboard");
-    } else {
-      alert("Invalid credentials");
+    try {
+      // Call the backend admin login API
+      const response = await axios.post("http://127.0.0.1:5000/admin/login", {
+        email,
+        password,
+      });
+      if (response.data.msg == "Login successful") {
+        console.log(response.data);
+        localStorage.setItem("user", JSON.stringify(response.data.user));
+        router.replace("/advertiser/dashboard");
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Login Error",
+          text: response.data.msg,
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      }
+    } catch (error: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Login Error",
+        text: error.response ? error.response.data.msg : error.message,
+        timer: 1500,
+        showConfirmButton: false,
+      });
     }
   };
 

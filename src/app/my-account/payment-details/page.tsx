@@ -47,7 +47,11 @@ const PaymentPage: React.FC = () => {
 
   const fetchPaymentMethods = async (userId: string) => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/payment/payment-details/user/${userId}`);
+      const response = await fetch("http://127.0.0.1:5000/payment/userdetail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
       const data = await response.json();
       if (data.status === 200) {
         setPaymentMethods(data.payments);
@@ -158,7 +162,7 @@ const PaymentPage: React.FC = () => {
       Swal.fire("Error", "User not found. Please log in again.", "error");
       return;
     }
-  
+
     const confirmDelete = await Swal.fire({
       title: "Are you sure?",
       text: "You won't be able to recover this payment method!",
@@ -168,7 +172,7 @@ const PaymentPage: React.FC = () => {
       cancelButtonColor: "#3085d6",
       confirmButtonText: "Yes, delete it!",
     });
-  
+
     if (confirmDelete.isConfirmed) {
       try {
         const res = await fetch("http://127.0.0.1:5000/payment/delete", {
@@ -176,9 +180,9 @@ const PaymentPage: React.FC = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId, paymentId }),
         });
-  
+
         const data = await res.json();
-  
+
         if (res.ok) {
           Swal.fire("Deleted!", data.msg, "success");
           fetchPaymentMethods(userId); // Refresh payment methods
@@ -190,12 +194,10 @@ const PaymentPage: React.FC = () => {
       }
     }
   };
-  
 
   return (
-    <div className="min-h-screen flex flex-col bg-green-50 dark:bg-zinc-950 p-6 text-gray-800 dark:text-gray-100">
-      {/* Payment Methods Table */}
-      <div className="w-full max-w-4xl mx-auto mb-6">
+    <div className="min-h-screen flex flex-col items-center bg-green-50 dark:bg-zinc-950 p-6 text-gray-800 dark:text-gray-100">
+      <div className="w-full max-w-4xl bg-white rounded-xl shadow-xl border border-green-200 dark:border-green-700 p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-3xl font-bold text-green-900 dark:text-green-200">My Payment Methods</h2>
           <button
@@ -209,7 +211,16 @@ const PaymentPage: React.FC = () => {
           </button>
         </div>
         {paymentMethods.length === 0 ? (
-          <p className="text-green-700 dark:text-green-300">No payment methods added yet.</p>
+          <div className="flex flex-col items-center justify-center py-10">
+            <span className="text-6xl mb-4">💳</span>
+            <p className="text-lg text-gray-700 dark:text-gray-300">
+              No Payment Method Added Yet!
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Please add your preferred payment method to start receiving payouts.
+            </p>
+          </div>
+
         ) : (
           <div className="grid gap-4">
             {paymentMethods.map((payment) => (
@@ -238,14 +249,12 @@ const PaymentPage: React.FC = () => {
                     >
                       {expandedPayment === payment.paymentId ? <FaChevronUp /> : <FaChevronDown />}
                     </button>
-
                     <button
                       onClick={() => handleEditPayment(payment)}
                       className="text-green-600 dark:text-green-300 hover:text-green-800"
                     >
                       <FaEdit />
                     </button>
-
                     <button
                       onClick={() => handleDeletePayment(payment.paymentId)}
                       className="text-red-600 dark:text-red-300 hover:text-red-800"
@@ -254,7 +263,6 @@ const PaymentPage: React.FC = () => {
                     </button>
                   </div>
                 </div>
-
                 {expandedPayment === payment.paymentId && (
                   <div className="mt-4 pt-3 text-sm text-green-800 dark:text-green-200 border-t border-green-200 dark:border-green-600 space-y-1">
                     {payment.paymentMethod === 1 ? (
