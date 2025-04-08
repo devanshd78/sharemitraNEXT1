@@ -69,7 +69,7 @@ const PaymentStatus: React.FC = () => {
             <Clock size={14} /> Processing
           </span>
         );
-      case "Declined":
+      case "Reversed":
         return (
           <span className={`${base} bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-100`}>
             <AlertTriangle size={14} /> Declined

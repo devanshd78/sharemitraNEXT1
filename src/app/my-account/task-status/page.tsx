@@ -7,11 +7,13 @@ interface TaskHistory {
   taskId: string;
   userId: string;
   matched_link: string;
-  group_name: string;
+  task_name: string; // Updated to reflect task name instead of group name
   participant_count: number;
-  details: any;
+  task_details: any;
   verified: boolean;
   verifiedAt: string;
+  image_phash: string;
+  task_price: number;
 }
 
 const TaskStatus: React.FC = () => {
@@ -19,12 +21,12 @@ const TaskStatus: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Determine status string and corresponding style classes
+  // Determines the status string and corresponding style classes
   const getStatusInfo = (verified: boolean) => {
     if (verified) {
       return { status: "Completed", style: "bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100" };
     } else {
-      return { status: "Pending", style: "bg-yellow-100 dark:bg-yellow-700 text-yellow-800 dark:text-yellow-100" };
+      return { status: "Rejected", style: "bg-red-100 dark:bg-red-700 text-red-800 dark:text-red-100" };
     }
   };
 
@@ -49,7 +51,7 @@ const TaskStatus: React.FC = () => {
         }
 
         const json = await response.json();
-        // Expecting { userId: string, task_history: TaskHistory[] }
+        // Expected response: { userId: string, task_history: TaskHistory[] }
         setTasks(json.task_history);
       } catch (error: any) {
         console.error("Error fetching task history:", error);
@@ -88,6 +90,8 @@ const TaskStatus: React.FC = () => {
                 <tr className="bg-green-200 dark:bg-green-800 text-green-900 dark:text-green-100 uppercase tracking-wide">
                   <th className="px-4 py-3 rounded-tl-lg text-left">No.</th>
                   <th className="px-4 py-3 text-left">Task Title</th>
+                  <th className="px-4 py-3 text-left">Link</th>
+                  <th className="px-4 py-3 text-left">Task Description</th>
                   <th className="px-4 py-3 text-left">Status</th>
                   <th className="px-4 py-3 rounded-tr-lg text-left">Created At</th>
                 </tr>
@@ -104,7 +108,11 @@ const TaskStatus: React.FC = () => {
                       className="bg-white dark:bg-zinc-800 border border-green-100 dark:border-green-700 rounded-lg shadow-sm hover:bg-green-50 dark:hover:bg-green-900 transition-colors"
                     >
                       <td className="px-4 py-4 font-semibold text-gray-800 dark:text-gray-100">{index + 1}</td>
-                      <td className="px-4 py-4 text-gray-700 dark:text-gray-200">{task.group_name}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-200">{task.task_name}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-200"> <a href={task.matched_link} target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400 hover:text-blue-800">
+                        {task.matched_link} </a> 
+                      </td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-200">{task.task_details.description}</td>
                       <td className="px-4 py-4">
                         <span className={`px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${style}`}>
                           {status}

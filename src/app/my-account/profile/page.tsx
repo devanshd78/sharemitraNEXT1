@@ -10,8 +10,10 @@ interface ProfileType {
   email: string;
   phone: string;
   dob?: string;
-  state?: string;
-  city?: string;
+  stateId?: string;
+  stateName?: string;
+  cityId?: string;
+  cityName?: string;
   referralCode?: string;
   totalPayoutAmount?: number;
   createdAt?: string;
@@ -31,6 +33,7 @@ interface StateOption {
 
 const Profile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
+  const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileType>({
     userId: "",
@@ -38,8 +41,10 @@ const Profile: React.FC = () => {
     email: "",
     phone: "",
     dob: "",
-    state: "",
-    city: "",
+    stateId: "",
+    stateName: "",
+    cityId: "",
+    cityName: "",
     referralCode: "",
     totalPayoutAmount: 0,
   });
@@ -74,6 +79,7 @@ const Profile: React.FC = () => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       const user = JSON.parse(storedUser);
+      setUserId(user.userId)
       fetchProfile(user.userId);
     }
   }, []);
@@ -98,15 +104,15 @@ const Profile: React.FC = () => {
 
   // Update city options when profile.state or stateOptions changes
   useEffect(() => {
-    if (profile.state && stateOptions.length > 0) {
-      const matchedState = stateOptions.find((s) => s.value === profile.state);
+    if (profile.stateId && stateOptions.length > 0) {
+      const matchedState = stateOptions.find((s) => s.value === profile.stateId);
       if (matchedState) {
         setCityOptions(matchedState.cities);
       } else {
         setCityOptions([]);
       }
     }
-  }, [profile.state, stateOptions]);
+  }, [profile.stateId, stateOptions]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -159,7 +165,7 @@ const Profile: React.FC = () => {
       if (data.message === "User details updated.") {
         localStorage.setItem("user", JSON.stringify(profile));
         setIsEditing(false);
-        setOriginalProfile(profile);
+        fetchProfile(profile.userId)
         Swal.fire("Updated!", "Profile updated successfully.", "success");
       } else {
         showError(data.msg);
@@ -260,10 +266,6 @@ const Profile: React.FC = () => {
       showError("Error verifying phone.");
     }
   };
-
-  // For non-edit mode, display state and city as "ID (Name)"
-  const stateOption = stateOptions.find((s) => s.value === profile.state);
-  const cityOption = cityOptions.find((c) => c.value === profile.city);
 
   if (loading) {
     return (
@@ -367,8 +369,8 @@ const Profile: React.FC = () => {
             </label>
             {isEditing ? (
               <select
-                name="state"
-                value={profile.state || ""}
+                name="stateId"
+                value={profile.stateId || ""}
                 onChange={handleChange}
                 className={inputClass(isEditing)}
               >
@@ -381,7 +383,7 @@ const Profile: React.FC = () => {
               </select>
             ) : (
               <div className={inputClass(false)}>
-                {stateOption ? `${stateOption.label}` : ""}
+                {profile.stateName || ""}
               </div>
             )}
           </div>
@@ -391,13 +393,15 @@ const Profile: React.FC = () => {
             </label>
             {isEditing ? (
               <select
-                name="city"
-                value={profile.city || ""}
+                name="cityId"
+                value={profile.cityId || ""}
                 onChange={handleChange}
-                disabled={!profile.state}
+                disabled={!profile.stateId}
                 className={inputClass(isEditing)}
               >
-                <option value="">{profile.state ? "Select City" : "Select State first"}</option>
+                <option value="">
+                  {cityOptions.length === 0 ? "Select a state first" : "Select City"}
+                </option>
                 {cityOptions.map((city) => (
                   <option key={city.value} value={city.value}>
                     {city.label}
@@ -406,7 +410,7 @@ const Profile: React.FC = () => {
               </select>
             ) : (
               <div className={inputClass(false)}>
-                {cityOption ? `${cityOption.label}` : ""}
+                {profile.cityName || ""}
               </div>
             )}
           </div>

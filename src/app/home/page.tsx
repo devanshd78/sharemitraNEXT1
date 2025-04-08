@@ -15,6 +15,7 @@ import { useModalStore } from "../stores/modalStore";
 import LoginModal from "./login";
 import TaskUploadModal from "./screenshotModal";
 import { Lexend } from "next/font/google";
+import Swal from "sweetalert2";
 
 const lexend = Lexend({
   subsets: ["latin"],
@@ -152,7 +153,13 @@ const HomePage: React.FC = () => {
 
   const handleCopyMessage = (message: string) => {
     navigator.clipboard.writeText(message);
-    alert("Message copied!");
+    Swal.fire({
+      title: "Copied!",
+      text: "Message copied to clipboard.",
+      icon: "success",
+      timer: 1500,
+      showConfirmButton: false,
+    });
   };
 
   const handleSendWhatsApp = (message: string) => {
@@ -254,7 +261,7 @@ const HomePage: React.FC = () => {
           <div className="min-h-[500px] flex flex-col">
             <div className="bg-gradient-to-r from-green-300 to-green-200 dark:from-zinc-700 dark:to-zinc-600 p-1 rounded-xl shadow-xl flex-1">
               <div className="bg-white dark:bg-zinc-900 p-8 rounded-xl h-full flex flex-col justify-center">
-                <p className="text-base sm:text-lg lg:text-xl text-gray-700 dark:text-gray-300">
+                <p className="text-base sm:text-lg lg:text-xl text-gray-700 dark:text-gray-300 text-justify">
                   ShareMitra is an innovative platform designed to empower users by providing opportunities to earn extra income through completing simple online tasks. Our user-friendly interface and reliable system ensure that every task is straightforward and rewarding. Whether you’re looking for flexible work hours or an additional source of income, ShareMitra offers a variety of tasks that cater to your skills and interests. Our secure payment system and responsive support team guarantee prompt assistance and timely payments. Join our community today and start your journey towards financial freedom.
                 </p>
               </div>

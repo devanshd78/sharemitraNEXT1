@@ -15,8 +15,8 @@ interface SignupData {
   email: string;
   phone: string;
   dob: string;
-  state: string;
-  city: string;
+  stateId: string;
+  cityId: string;
   referralCode: string;
 }
 
@@ -57,8 +57,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
     email: "",
     phone: "",
     dob: "",
-    state: "",
-    city: "",
+    stateId: "",
+    cityId: "",
     referralCode: "",
   });
   const [signupStep, setSignupStep] = useState(1);
@@ -123,8 +123,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
     } else if (signupStep === 3) {
       if (!signupData.dob)
         tempErrors.dob = "Date of Birth is required";
-      if (!signupData.state) tempErrors.state = "State is required";
-      if (!signupData.city) tempErrors.city = "City is required";
+      if (!signupData.stateId) tempErrors.state = "State is required";
+      if (!signupData.cityId) tempErrors.city = "City is required";
     }
     setErrors(tempErrors);
     return Object.keys(tempErrors).length === 0;
@@ -508,8 +508,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
               email: "",
               phone: "",
               dob: "",
-              state: "",
-              city: "",
+              stateId: "",
+              cityId: "",
               referralCode: "",
             });
           });
@@ -649,13 +649,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                 {/* Identifier Field */}
                 <div className="mb-4">
                   <label className="block mb-1 text-black">
-                    Email or Phone{" "}
+                    Email or Phone Number{" "}
                     <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     name="identifier"
-                    placeholder="Enter email or phone"
+                    placeholder="Enter email or phone Number"
                     value={loginData.identifier}
                     onChange={handleChange}
                     className="w-full border border-gray-300 rounded p-2 text-gray-600"
@@ -919,10 +919,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                         State <span className="text-red-500">*</span>
                       </label>
                       <select
-                        value={signupData.state}
+                        value={signupData.stateId}
                         onChange={(e: ChangeEvent<HTMLSelectElement>) => {
                           const selectedValue = e.target.value;
-                          setSignupData((prev) => ({ ...prev, state: selectedValue, city: "" }));
+                          setSignupData((prev) => ({ ...prev, stateId: selectedValue, cityId: "" }));
                           // Update city options for the selected state.
                           const selectedState = stateOptions.find((s) => s.value === selectedValue);
                           if (selectedState) {
@@ -945,17 +945,18 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                       )}
                     </div>
 
+
                     {/* City Select */}
                     <div className="mb-6">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         City <span className="text-red-500">*</span>
                       </label>
                       <select
-                        value={signupData.city}
+                        value={signupData.cityId}
                         onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                          setSignupData((prev) => ({ ...prev, city: e.target.value }))
+                          setSignupData((prev) => ({ ...prev, cityId: e.target.value }))
                         }
-                        disabled={cityOptions.length === 0 || !signupData.state}
+                        disabled={cityOptions.length === 0 || !signupData.stateId}
                         className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-green-600 focus:ring-2 focus:ring-green-600 transition duration-150 ease-in-out"
                       >
                         <option value="">
@@ -971,6 +972,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                         <p className="mt-1 text-xs text-red-600">{errors.city}</p>
                       )}
                     </div>
+
 
                     <div className="mb-6">
                       <label className="block text-sm font-medium text-gray-700 mb-1">

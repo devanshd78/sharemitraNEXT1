@@ -92,10 +92,10 @@ const WalletPage = () => {
   const handleWithdrawConfirm = async () => {
     const amount = parseInt(withdrawAmount);
 
-    if (isNaN(amount) || amount < 500) {
+    if (isNaN(amount) || amount < 10) {
       Swal.fire({
         title: "Invalid Amount",
-        text: "Please enter at least ₹500 to withdraw.",
+        text: "Please enter at least ₹10 to withdraw.",
         icon: "warning",
         timer: 1500,
         showConfirmButton: false,
@@ -232,15 +232,15 @@ const WalletPage = () => {
         </div>
 
         <p className="text-sm text-gray-700 dark:text-gray-400 mb-6 text-center">
-          🔒 Withdrawals allowed only after ₹500 is available.
+          🔒 Withdrawals allowed only after ₹10 is available.
         </p>
 
         <Dialog open={openPaymentDialog} onOpenChange={setOpenPaymentDialog}>
           <DialogTrigger asChild>
             <Button
-              disabled={walletData.availableToWithdraw < 500}
+              disabled={walletData.availableToWithdraw < 10}
               className={`w-full py-3 text-white font-semibold rounded-lg transition ${
-                walletData.availableToWithdraw >= 500
+                walletData.availableToWithdraw >= 10
                   ? "bg-green-600 hover:bg-green-700"
                   : "bg-gray-400 cursor-not-allowed"
               }`}
@@ -262,7 +262,7 @@ const WalletPage = () => {
                 type="number"
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
-                placeholder="Enter amount (min ₹500)"
+                placeholder="Enter amount (min ₹10)"
                 className="w-full px-4 py-3 rounded-md border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-400"
               />
             </div>

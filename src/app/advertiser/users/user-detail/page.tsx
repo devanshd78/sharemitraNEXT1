@@ -19,18 +19,30 @@ type UserDetail = {
   name: string;
   email: string;
   phone: string;
+  dob: string;
+  stateId: string;
+  stateName: string;
+  cityId: string;
+  cityName: string;
   createdAt: string;
   updatedAt: string;
 };
 
 type Task = {
   taskId: string;
-  group_name: string;
+  task_name: string;
   matched_link: string;
   participant_count: number;
   verified: boolean;
   verifiedAt: string;
+  task_details: {
+    description: string;
+  };
+  task_price: number;
+  image_phash: string;
+  userId: string;
 };
+
 
 type Payment = {
   _id: string;
@@ -45,7 +57,6 @@ type Payment = {
   upiId?: string;
 };
 
-
 type Payout = {
   payout_id: string;
   amount: number;
@@ -58,6 +69,7 @@ const UserDetailPage = () => {
   const searchParams = useSearchParams();
   const userId = searchParams.get("Id"); // Read query param "Id"
   const router = useRouter();
+
   const [user, setUser] = useState<UserDetail | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -74,7 +86,7 @@ const UserDetailPage = () => {
           throw new Error("Failed to fetch user details");
         }
         const data = await res.json();
-        setUser(data.user); // Expecting API returns { user: { ... } }
+        setUser(data); // Expecting API returns user details
       } catch (err: any) {
         setError(err.message);
       }
@@ -101,7 +113,7 @@ const UserDetailPage = () => {
           throw new Error("Failed to fetch task history");
         }
         const data = await res.json();
-        setTasks(data.task_history); // Expecting API returns { task_history: [ ... ] }
+        setTasks(data.task_history); // Expecting { task_history: [...] }
       } catch (err: any) {
         console.error(err);
       }
@@ -115,12 +127,16 @@ const UserDetailPage = () => {
   useEffect(() => {
     async function fetchPayments() {
       try {
-        const res = await fetch(`http://127.0.0.1:5000/payment/payment-details/user/${userId}`);
-        if (!res.ok) {
+        const response = await fetch("http://127.0.0.1:5000/payment/userdetail", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
+        if (!response.ok) {
           throw new Error("Failed to fetch payment details");
         }
-        const data = await res.json();
-        setPayments(data.payments); // Expecting API returns { payments: [ ... ] }
+        const data = await response.json();
+        setPayments(data.payments); // Expecting { payments: [...] }
       } catch (err: any) {
         console.error(err);
       }
@@ -139,7 +155,7 @@ const UserDetailPage = () => {
           throw new Error("Failed to fetch payout status");
         }
         const data = await res.json();
-        setPayouts(data.payouts); // Expecting API returns { payouts: [ ... ] }
+        setPayouts(data.payouts); // Expecting { payouts: [...] }
       } catch (err: any) {
         console.error(err);
       }
@@ -149,7 +165,7 @@ const UserDetailPage = () => {
     }
   }, [userId]);
 
-  // Determine overall loading state. For simplicity, mark loading as false once user details load.
+  // Determine overall loading state. Mark loading false once user details load.
   useEffect(() => {
     if (user || error) {
       setLoading(false);
@@ -189,26 +205,28 @@ const UserDetailPage = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-3 text-lg">
+            <div><strong>User ID:</strong> {user.userId}</div>
+            <div><strong>Name:</strong> {user.name}</div>
+            <div><strong>Email:</strong> {user.email}</div>
+            <div><strong>Phone:</strong> {user.phone}</div>
             <div>
-              <strong>User ID:</strong> {user.userId}
+              <strong>Date of Birth:</strong>{" "}
+              {user.dob ? new Date(user.dob).toLocaleDateString() : "N/A"}
             </div>
             <div>
-              <strong>Name:</strong> {user.name}
+              <strong>State:</strong> {user.stateName || "N/A"}
             </div>
             <div>
-              <strong>Email:</strong> {user.email}
+              <strong>City:</strong> {user.cityName || "N/A"}
+            </div>
+            <div><strong>Referral Code:</strong> {user.referralCode}</div>
+            <div>
+              <strong>Created At:</strong>{" "}
+              {new Date(user.createdAt).toLocaleString()}
             </div>
             <div>
-              <strong>Phone:</strong> {user.phone}
-            </div>
-            <div>
-              <strong>Referral Code:</strong> {user.referralCode}
-            </div>
-            <div>
-              <strong>Created At:</strong> {new Date(user.createdAt).toLocaleString()}
-            </div>
-            <div>
-              <strong>Updated At:</strong> {new Date(user.updatedAt).toLocaleString()}
+              <strong>Updated At:</strong>{" "}
+              {new Date(user.updatedAt).toLocaleString()}
             </div>
           </div>
         </CardContent>
@@ -227,7 +245,9 @@ const UserDetailPage = () => {
               <TableRow>
                 <TableCell>No.</TableCell>
                 <TableCell>Task ID</TableCell>
-                <TableCell>Group Name</TableCell>
+                <TableCell>Task Name</TableCell>
+                <TableCell>Task Description</TableCell>
+                <TableCell>Task Price</TableCell>
                 <TableCell>Matched Link</TableCell>
                 <TableCell>Participant Count</TableCell>
                 <TableCell>Verified</TableCell>
@@ -239,9 +259,17 @@ const UserDetailPage = () => {
                 <TableRow key={`${task.taskId}-${index}`}>
                   <TableCell>{index + 1}</TableCell>
                   <TableCell>{task.taskId}</TableCell>
-                  <TableCell>{task.group_name}</TableCell>
+                  <TableCell>{task.task_name}</TableCell>
+                  <TableCell>{task.task_details.description}</TableCell>
+                  <TableCell>{task.task_price}</TableCell>
                   <TableCell>
-                    <a href={task.matched_link} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={task.matched_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={task.matched_link} // Tooltip displays the matched link.
+                      className="underline text-blue-600 dark:text-blue-400 hover:text-blue-800"
+                    >
                       Link
                     </a>
                   </TableCell>
@@ -254,6 +282,7 @@ const UserDetailPage = () => {
           </Table>
         </CardContent>
       </Card>
+
 
       {/* Payment Details Card */}
       <Card className="shadow-lg p-4">

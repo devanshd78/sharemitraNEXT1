@@ -92,12 +92,6 @@ const Navbar: React.FC<NavbarProps> = ({ walletBalance }) => {
             Task
           </span>
           <span
-            onClick={() => router.push("/home/prev-task")}
-            className="text-base font-semibold cursor-pointer hover:text-green-500 dark:hover:text-green-400"
-          >
-            Prev Task
-          </span>
-          <span
             onClick={() => router.push("/contact-us")}
             className="text-base font-semibold cursor-pointer hover:text-green-500 dark:hover:text-green-400"
           >
