@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,9 @@ import {
   TableRow,
   TableCell,
   TableBody,
+  TableCaption,
 } from "@/components/ui/table";
+import Swal from "sweetalert2";
 
 type UserDetail = {
   userId: string;
@@ -43,7 +45,6 @@ type Task = {
   userId: string;
 };
 
-
 type Payment = {
   _id: string;
   paymentId: string;
@@ -65,28 +66,66 @@ type Payout = {
   status: string;
 };
 
+// Simple spinner component using Tailwind CSS classes.
+const LoadingSpinner: React.FC = () => (
+  <div className="flex items-center justify-center p-4">
+    <svg
+      className="animate-spin h-6 w-6 text-green-600"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      ></circle>
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      ></path>
+    </svg>
+    <span className="ml-2 text-green-600 font-medium">Loading...</span>
+  </div>
+);
+
 const UserDetailPage = () => {
   const searchParams = useSearchParams();
   const userId = searchParams.get("Id"); // Read query param "Id"
   const router = useRouter();
 
+  // Global state for user details.
   const [user, setUser] = useState<UserDetail | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [payouts, setPayouts] = useState<Payout[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch user details
+  // Separate states for tasks, payments and payouts.
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasksLoading, setTasksLoading] = useState<boolean>(true);
+
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState<boolean>(true);
+
+  const [payouts, setPayouts] = useState<Payout[]>([]);
+  const [payoutsLoading, setPayoutsLoading] = useState<boolean>(true);
+
+  // ---------------------------
+  // Fetch User Details
+  // ---------------------------
   useEffect(() => {
     async function fetchUser() {
       try {
         const res = await fetch(`http://127.0.0.1:5000/user/getbyid?userId=${userId}`);
-        if (!res.ok) {
-          throw new Error("Failed to fetch user details");
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.message || "Failed to fetch user details");
         }
-        const data = await res.json();
-        setUser(data); // Expecting API returns user details
+        // User details are in json.data
+        setUser(json.data);
       } catch (err: any) {
         setError(err.message);
       }
@@ -98,24 +137,28 @@ const UserDetailPage = () => {
     }
   }, [userId]);
 
-  // Fetch task history via POST
+  // ---------------------------
+  // Fetch Task History
+  // ---------------------------
   useEffect(() => {
     async function fetchTasks() {
+      setTasksLoading(true);
       try {
-        const res = await fetch(`http://127.0.0.1:5000/task/history`, {
+        const res = await fetch("http://127.0.0.1:5000/task/history", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId }),
         });
-        if (!res.ok) {
-          throw new Error("Failed to fetch task history");
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.message || "Failed to fetch task history");
         }
-        const data = await res.json();
-        setTasks(data.task_history); // Expecting { task_history: [...] }
+        // Task history is in json.data.task_history.
+        setTasks(json.data.task_history);
       } catch (err: any) {
-        console.error(err);
+        console.error("Error fetching tasks:", err);
+      } finally {
+        setTasksLoading(false);
       }
     }
     if (userId) {
@@ -123,22 +166,28 @@ const UserDetailPage = () => {
     }
   }, [userId]);
 
-  // Fetch payment details
+  // ---------------------------
+  // Fetch Payment Details
+  // ---------------------------
   useEffect(() => {
     async function fetchPayments() {
+      setPaymentsLoading(true);
       try {
         const response = await fetch("http://127.0.0.1:5000/payment/userdetail", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId }),
         });
-        if (!response.ok) {
-          throw new Error("Failed to fetch payment details");
+        const json = await response.json();
+        if (!response.ok || !json.success) {
+          throw new Error(json.message || "Failed to fetch payment details");
         }
-        const data = await response.json();
-        setPayments(data.payments); // Expecting { payments: [...] }
+        // Payment details are in json.data.payments.
+        setPayments(json.data.payments);
       } catch (err: any) {
-        console.error(err);
+        console.error("Error fetching payments:", err);
+      } finally {
+        setPaymentsLoading(false);
       }
     }
     if (userId) {
@@ -146,18 +195,24 @@ const UserDetailPage = () => {
     }
   }, [userId]);
 
-  // Fetch payout status
+  // ---------------------------
+  // Fetch Payout Status
+  // ---------------------------
   useEffect(() => {
     async function fetchPayouts() {
+      setPayoutsLoading(true);
       try {
         const res = await fetch(`http://127.0.0.1:5000/payout/status?userId=${userId}`);
-        if (!res.ok) {
-          throw new Error("Failed to fetch payout status");
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.message || "Failed to fetch payout status");
         }
-        const data = await res.json();
-        setPayouts(data.payouts); // Expecting { payouts: [...] }
+        // Payout details are in json.data.payouts.
+        setPayouts(json.data.payouts);
       } catch (err: any) {
-        console.error(err);
+        console.error("Error fetching payouts:", err);
+      } finally {
+        setPayoutsLoading(false);
       }
     }
     if (userId) {
@@ -165,17 +220,20 @@ const UserDetailPage = () => {
     }
   }, [userId]);
 
-  // Determine overall loading state. Mark loading false once user details load.
+  // ---------------------------
+  // Set overall loading to false when user details load or error occurs.
+  // ---------------------------
   useEffect(() => {
     if (user || error) {
       setLoading(false);
     }
   }, [user, error]);
 
+  // Render overall loading, error or user not found states.
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-lg font-medium">Loading...</p>
+        <LoadingSpinner />
       </div>
     );
   }
@@ -194,6 +252,9 @@ const UserDetailPage = () => {
     );
   }
 
+  // ---------------------------
+  // Render the User Detail Page
+  // ---------------------------
   return (
     <div className="p-4 space-y-8">
       {/* User Detail Card */}
@@ -240,49 +301,52 @@ const UserDetailPage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableCell>No.</TableCell>
-                <TableCell>Task ID</TableCell>
-                <TableCell>Task Name</TableCell>
-                <TableCell>Task Description</TableCell>
-                <TableCell>Task Price</TableCell>
-                <TableCell>Matched Link</TableCell>
-                <TableCell>Participant Count</TableCell>
-                <TableCell>Verified</TableCell>
-                <TableCell>Verified At</TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tasks.map((task, index) => (
-                <TableRow key={`${task.taskId}-${index}`}>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell>{task.taskId}</TableCell>
-                  <TableCell>{task.task_name}</TableCell>
-                  <TableCell>{task.task_details.description}</TableCell>
-                  <TableCell>{task.task_price}</TableCell>
-                  <TableCell>
-                    <a
-                      href={task.matched_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={task.matched_link} // Tooltip displays the matched link.
-                      className="underline text-blue-600 dark:text-blue-400 hover:text-blue-800"
-                    >
-                      Link
-                    </a>
-                  </TableCell>
-                  <TableCell>{task.participant_count}</TableCell>
-                  <TableCell>{task.verified ? "Yes" : "No"}</TableCell>
-                  <TableCell>{new Date(task.verifiedAt).toLocaleString()}</TableCell>
+          {tasksLoading ? (
+            <LoadingSpinner />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableCell>No.</TableCell>
+                  <TableCell>Task ID</TableCell>
+                  <TableCell>Task Name</TableCell>
+                  <TableCell>Task Description</TableCell>
+                  <TableCell>Task Price</TableCell>
+                  <TableCell>Matched Link</TableCell>
+                  <TableCell>Participant Count</TableCell>
+                  <TableCell>Verified</TableCell>
+                  <TableCell>Verified At</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {tasks.map((task, index) => (
+                  <TableRow key={`${task.taskId}-${index}`}>
+                    <TableCell>{index + 1}</TableCell>
+                    <TableCell>{task.taskId}</TableCell>
+                    <TableCell>{task.task_name}</TableCell>
+                    <TableCell>{task.task_details.description}</TableCell>
+                    <TableCell>{task.task_price}</TableCell>
+                    <TableCell>
+                      <a
+                        href={task.matched_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={task.matched_link}
+                        className="underline text-blue-600 hover:text-blue-800"
+                      >
+                        Link
+                      </a>
+                    </TableCell>
+                    <TableCell>{task.participant_count}</TableCell>
+                    <TableCell>{task.verified ? "Yes" : "No"}</TableCell>
+                    <TableCell>{new Date(task.verifiedAt).toLocaleString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
-
 
       {/* Payment Details Card */}
       <Card className="shadow-lg p-4">
@@ -292,37 +356,41 @@ const UserDetailPage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableCell>No.</TableCell>
-                <TableCell>Payment ID</TableCell>
-                <TableCell>Payment Method</TableCell>
-                <TableCell>Details</TableCell>
-                <TableCell>Created At</TableCell>
-                <TableCell>Updated At</TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {payments.map((payment, index) => {
-                const paymentMethod = payment.paymentMethod === 1 ? "Bank" : "UPI";
-                const details =
-                  paymentMethod === "Bank"
-                    ? `${payment.accountHolder} - ${payment.bankName} (${payment.accountNumber})`
-                    : payment.upiId || "N/A";
-                return (
-                  <TableRow key={`${payment._id}-${index}`}>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell>{payment.paymentId}</TableCell>
-                    <TableCell>{paymentMethod}</TableCell>
-                    <TableCell>{details}</TableCell>
-                    <TableCell>{new Date(payment.created_at).toLocaleString()}</TableCell>
-                    <TableCell>{new Date(payment.updated_at).toLocaleString()}</TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          {paymentsLoading ? (
+            <LoadingSpinner />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableCell>No.</TableCell>
+                  <TableCell>Payment ID</TableCell>
+                  <TableCell>Payment Method</TableCell>
+                  <TableCell>Details</TableCell>
+                  <TableCell>Created At</TableCell>
+                  <TableCell>Updated At</TableCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {payments.map((payment, index) => {
+                  const paymentMethod = payment.paymentMethod === 1 ? "Bank" : "UPI";
+                  const details =
+                    paymentMethod === "Bank"
+                      ? `${payment.accountHolder} - ${payment.bankName} (${payment.accountNumber})`
+                      : payment.upiId || "N/A";
+                  return (
+                    <TableRow key={`${payment._id}-${index}`}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>{payment.paymentId}</TableCell>
+                      <TableCell>{paymentMethod}</TableCell>
+                      <TableCell>{details}</TableCell>
+                      <TableCell>{new Date(payment.created_at).toLocaleString()}</TableCell>
+                      <TableCell>{new Date(payment.updated_at).toLocaleString()}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -334,30 +402,34 @@ const UserDetailPage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableCell>No.</TableCell>
-                <TableCell>Payout ID</TableCell>
-                <TableCell>Amount</TableCell>
-                <TableCell>Withdraw Time</TableCell>
-                <TableCell>Mode</TableCell>
-                <TableCell>Status</TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {payouts.map((payout, index) => (
-                <TableRow key={`${payout.payout_id}-${index}`}>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell>{payout.payout_id}</TableCell>
-                  <TableCell>₹ {payout.amount}</TableCell>
-                  <TableCell>{new Date(payout.withdraw_time).toLocaleString()}</TableCell>
-                  <TableCell>{payout.mode}</TableCell>
-                  <TableCell>{payout.status}</TableCell>
+          {payoutsLoading ? (
+            <LoadingSpinner />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableCell>No.</TableCell>
+                  <TableCell>Payout ID</TableCell>
+                  <TableCell>Amount</TableCell>
+                  <TableCell>Withdraw Time</TableCell>
+                  <TableCell>Mode</TableCell>
+                  <TableCell>Status</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {payouts.map((payout, index) => (
+                  <TableRow key={`${payout.payout_id}-${index}`}>
+                    <TableCell>{index + 1}</TableCell>
+                    <TableCell>{payout.payout_id}</TableCell>
+                    <TableCell>₹ {payout.amount}</TableCell>
+                    <TableCell>{new Date(payout.withdraw_time).toLocaleString()}</TableCell>
+                    <TableCell>{payout.mode}</TableCell>
+                    <TableCell>{payout.status}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

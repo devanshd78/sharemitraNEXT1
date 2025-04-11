@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useEffect, useState, ChangeEvent } from "react";
+import React, { useState, useEffect, FormEvent, ChangeEvent } from "react";
 import Swal from "sweetalert2";
 import axios from "axios";
+import { useRouter } from "next/navigation";
 
 interface ProfileType {
   userId: string;
@@ -32,6 +33,7 @@ interface StateOption {
 }
 
 const Profile: React.FC = () => {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -54,32 +56,41 @@ const Profile: React.FC = () => {
   const [stateOptions, setStateOptions] = useState<StateOption[]>([]);
   const [cityOptions, setCityOptions] = useState<CityOption[]>([]);
 
-  // Fetch state options for the select inputs
+  // Function to show error via SweetAlert
+  const showError = (msg: string) => {
+    Swal.fire("Error", msg, "error");
+  };
+
+  // Fetch state options for the select inputs from API
   useEffect(() => {
     axios
       .get("http://127.0.0.1:5000/contact/india_states")
       .then((res) => {
-        if (res.data && res.data.states) {
-          const options: StateOption[] = res.data.states.map((state: any) => ({
-            value: state.stateId, // Use stateId
-            label: state.state,   // Use state name
-            cities: state.cities.map((city: any) => ({
-              value: city.cityId, // Use cityId
-              label: city.name,   // City name
-            })) || [],
+        // Expecting a centralized response:
+        // { success: true, message: "...", data: { states: [...] } }
+        if (res.data && res.data.success) {
+          const options: StateOption[] = res.data.data.states.map((state: any) => ({
+            value: state.stateId,
+            label: state.state,
+            cities: (state.cities || []).map((city: any) => ({
+              value: city.cityId,
+              label: city.name,
+            })),
           }));
           setStateOptions(options);
+        } else {
+          console.error("Failed to fetch states:", res.data.message);
         }
       })
       .catch((err) => console.error("Error fetching state options:", err));
   }, []);
 
-  // Fetch user profile
+  // Fetch user profile from API
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       const user = JSON.parse(storedUser);
-      setUserId(user.userId)
+      setUserId(user.userId);
       fetchProfile(user.userId);
     }
   }, []);
@@ -87,22 +98,23 @@ const Profile: React.FC = () => {
   const fetchProfile = async (userId: string) => {
     try {
       const res = await fetch(`http://localhost:5000/user/getbyid?userId=${userId}`);
-      const data = await res.json();
-      if (res.ok) {
-        setProfile(data);
-        setOriginalProfile(data);
-        localStorage.setItem("user", JSON.stringify(data));
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        showError(json.message || "Failed to fetch profile.");
       } else {
-        showError(data.error || "Failed to fetch profile.");
+        // Assuming centralized response returns user details in json.data
+        setProfile(json.data);
+        setOriginalProfile(json.data);
+        localStorage.setItem("user", JSON.stringify(json.data));
       }
-    } catch {
+    } catch (err: any) {
       showError("Failed to fetch profile.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Update city options when profile.state or stateOptions changes
+  // Update city options when profile.stateId changes.
   useEffect(() => {
     if (profile.stateId && stateOptions.length > 0) {
       const matchedState = stateOptions.find((s) => s.value === profile.stateId);
@@ -114,8 +126,11 @@ const Profile: React.FC = () => {
     }
   }, [profile.stateId, stateOptions]);
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
+    // For phone field, remove non-digits.
     const processedValue = name === "phone" ? value.replace(/\D/g, "") : value;
     setProfile((prev) => ({ ...prev, [name]: processedValue }));
     
@@ -125,75 +140,32 @@ const Profile: React.FC = () => {
     if (name === "phone" && originalProfile && value !== originalProfile.phone) {
       setPhoneVerified(false);
     }
-    if (name === "state") {
-      // Update city options based on selected state
+    if (name === "stateId") {
+      // When state changes, find matching state and update city options.
       const selectedState = stateOptions.find((s) => s.value === value);
       if (selectedState) {
         setCityOptions(selectedState.cities);
+        setProfile((prev) => ({
+          ...prev,
+          stateName: selectedState.label,
+          cityId: "",
+          cityName: "",
+        }));
       } else {
         setCityOptions([]);
+        setProfile((prev) => ({ ...prev, stateName: "", cityId: "", cityName: "" }));
       }
-      setProfile((prev) => ({ ...prev, city: "" }));
+    }
+    if (name === "cityId") {
+      // When city changes, update cityName.
+      const selectedCity = cityOptions.find((city) => city.value === value);
+      setProfile((prev) => ({
+        ...prev,
+        cityName: selectedCity ? selectedCity.label : "",
+      }));
     }
   };
 
-  const handleSave = async () => {
-    if (profile.phone.length !== 10) {
-      return showError("Phone number must be exactly 10 digits.");
-    }
-    if (
-      originalProfile &&
-      profile.email !== originalProfile.email &&
-      !emailVerified
-    ) {
-      return showError("Please verify your new email before updating details.");
-    }
-    if (
-      originalProfile &&
-      profile.phone !== originalProfile.phone &&
-      !phoneVerified
-    ) {
-      return showError("Please verify your new phone before updating details.");
-    }
-    try {
-      const res = await fetch("http://localhost:5000/user/update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profile),
-      });
-      const data = await res.json();
-      if (data.message === "User details updated.") {
-        localStorage.setItem("user", JSON.stringify(profile));
-        setIsEditing(false);
-        fetchProfile(profile.userId)
-        Swal.fire("Updated!", "Profile updated successfully.", "success");
-      } else {
-        showError(data.msg);
-      }
-    } catch {
-      showError("Error updating profile.");
-    }
-  };
-
-  const handleCancel = () => {
-    if (originalProfile) {
-      setProfile(originalProfile);
-      setEmailVerified(profile.email === originalProfile.email);
-      setPhoneVerified(profile.phone === originalProfile.phone);
-    }
-    setIsEditing(false);
-  };
-
-  const showError = (msg: string) => {
-    Swal.fire("Error", msg, "error");
-  };
-
-  const inputClass = (active: boolean) =>
-    `w-full px-4 py-3 rounded-md border transition focus:outline-none focus:ring-2 ring-green-400
-    ${active ? "bg-white dark:bg-zinc-800 border-gray-300" : "bg-gray-100 dark:bg-zinc-900 cursor-not-allowed"}
-    text-gray-800 dark:text-white`;
-
-  // Verify email using SweetAlert2 modal
   const handleVerifyEmail = async () => {
     try {
       const sendRes = await fetch("http://localhost:5000/user/send_email_otp", {
@@ -233,7 +205,7 @@ const Profile: React.FC = () => {
   // Verify phone using SweetAlert2 modal
   const handleVerifyPhone = async () => {
     try {
-      const sendRes = await fetch("http://localhost:5000/user/send_phone_otp", {
+      const sendRes = await fetch("http://localhost:5000/user/sendOTP", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: profile.phone }),
@@ -249,7 +221,7 @@ const Profile: React.FC = () => {
         showCancelButton: true,
       });
       if (otp) {
-        const verifyRes = await fetch("http://localhost:5000/user/verify_phone_otp", {
+        const verifyRes = await fetch("http://localhost:5000/user/verifyOTP", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ phone: profile.phone, otp }),
@@ -265,6 +237,59 @@ const Profile: React.FC = () => {
     } catch (error) {
       showError("Error verifying phone.");
     }
+  };
+
+  const handleSave = async () => {
+    if (profile.phone.length !== 10) {
+      return showError("Phone number must be exactly 10 digits.");
+    }
+    if (
+      originalProfile &&
+      profile.email !== originalProfile.email &&
+      !emailVerified
+    ) {
+      return showError("Please verify your new email before updating details.");
+    }
+    if (
+      originalProfile &&
+      profile.phone !== originalProfile.phone &&
+      !phoneVerified
+    ) {
+      return showError("Please verify your new phone before updating details.");
+    }
+    try {
+      const res = await fetch("http://localhost:5000/user/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        localStorage.setItem("user", JSON.stringify(json.data || profile));
+        setIsEditing(false);
+        await fetchProfile(profile.userId);
+        Swal.fire({
+          icon: "success",
+          title: "Updated!",
+          text: json.message || "Profile updated successfully.",
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      } else {
+        showError(json.message || "Error updating profile.");
+      }
+    } catch (error) {
+      showError("Error updating profile.");
+    }
+  };
+
+  const handleCancel = () => {
+    if (originalProfile) {
+      setProfile(originalProfile);
+      setEmailVerified(profile.email === originalProfile.email);
+      setPhoneVerified(profile.phone === originalProfile.phone);
+    }
+    setIsEditing(false);
   };
 
   if (loading) {
@@ -293,7 +318,9 @@ const Profile: React.FC = () => {
               value={profile.name}
               onChange={handleChange}
               disabled={!isEditing}
-              className={inputClass(isEditing)}
+              className={`w-full px-4 py-3 border rounded-md transition focus:outline-none focus:ring-2 ring-green-400 ${
+                isEditing ? "bg-white dark:bg-zinc-800 border-gray-300" : "bg-gray-100 dark:bg-zinc-900 cursor-not-allowed"
+              } text-gray-800 dark:text-white`}
             />
           </div>
           <div>
@@ -306,7 +333,9 @@ const Profile: React.FC = () => {
               value={profile.dob || ""}
               onChange={handleChange}
               disabled={!isEditing}
-              className={inputClass(isEditing)}
+              className={`w-full px-4 py-3 border rounded-md transition focus:outline-none focus:ring-2 ring-green-400 ${
+                isEditing ? "bg-white dark:bg-zinc-800 border-gray-300" : "bg-gray-100 dark:bg-zinc-900 cursor-not-allowed"
+              } text-gray-800 dark:text-white`}
             />
           </div>
         </div>
@@ -323,21 +352,26 @@ const Profile: React.FC = () => {
                 value={profile.email}
                 onChange={handleChange}
                 disabled={!isEditing}
-                className={inputClass(isEditing)}
+                className={`w-full px-4 py-3 border rounded-md transition focus:outline-none focus:ring-2 ring-green-400 ${
+                  isEditing ? "bg-white dark:bg-zinc-800 border-gray-300" : "bg-gray-100 dark:bg-zinc-900 cursor-not-allowed"
+                } text-gray-800 dark:text-white`}
               />
-              {isEditing && profile.email !== originalProfile?.email && !emailVerified && (
-                <button
-                  onClick={handleVerifyEmail}
-                  className="px-3 py-2 bg-blue-600 text-white rounded-md"
-                >
-                  Verify
-                </button>
-              )}
+              {isEditing &&
+                originalProfile &&
+                profile.email !== originalProfile.email &&
+                !emailVerified && (
+                  <button
+                    onClick={handleVerifyEmail}
+                    className="px-3 py-2 bg-blue-600 text-white rounded-md"
+                  >
+                    Verify
+                  </button>
+                )}
             </div>
           </div>
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-              Phone Number
+              Phone
             </label>
             <div className="flex items-center space-x-2">
               <input
@@ -348,16 +382,21 @@ const Profile: React.FC = () => {
                 disabled={!isEditing}
                 minLength={10}
                 maxLength={10}
-                className={inputClass(isEditing)}
+                className={`w-full px-4 py-3 border rounded-md transition focus:outline-none focus:ring-2 ring-green-400 ${
+                  isEditing ? "bg-white dark:bg-zinc-800 border-gray-300" : "bg-gray-100 dark:bg-zinc-900 cursor-not-allowed"
+                } text-gray-800 dark:text-white`}
               />
-              {isEditing && profile.phone !== originalProfile?.phone && !phoneVerified && (
-                <button
-                  onClick={handleVerifyPhone}
-                  className="px-3 py-2 bg-blue-600 text-white rounded-md"
-                >
-                  Verify
-                </button>
-              )}
+              {isEditing &&
+                originalProfile &&
+                profile.phone !== originalProfile.phone &&
+                !phoneVerified && (
+                  <button
+                    onClick={handleVerifyPhone}
+                    className="px-3 py-2 bg-blue-600 text-white rounded-md"
+                  >
+                    Verify
+                  </button>
+                )}
             </div>
           </div>
         </div>
@@ -372,7 +411,9 @@ const Profile: React.FC = () => {
                 name="stateId"
                 value={profile.stateId || ""}
                 onChange={handleChange}
-                className={inputClass(isEditing)}
+                className={`w-full px-4 py-3 border rounded-md transition focus:outline-none focus:ring-2 ring-green-400 ${
+                  isEditing ? "bg-white dark:bg-zinc-800 border-gray-300" : "bg-gray-100 dark:bg-zinc-900 cursor-not-allowed"
+                } text-gray-800 dark:text-white`}
               >
                 <option value="">Select State</option>
                 {stateOptions.map((state) => (
@@ -382,7 +423,11 @@ const Profile: React.FC = () => {
                 ))}
               </select>
             ) : (
-              <div className={inputClass(false)}>
+              <div
+                className={`w-full px-4 py-3 border rounded-md transition ${
+                  false ? "bg-white dark:bg-zinc-800 border-gray-300" : "bg-gray-100 dark:bg-zinc-900"
+                } text-gray-800 dark:text-white`}
+              >
                 {profile.stateName || ""}
               </div>
             )}
@@ -397,10 +442,16 @@ const Profile: React.FC = () => {
                 value={profile.cityId || ""}
                 onChange={handleChange}
                 disabled={!profile.stateId}
-                className={inputClass(isEditing)}
+                className={`w-full px-4 py-3 border rounded-md transition focus:outline-none focus:ring-2 ring-green-400 ${
+                  isEditing
+                    ? "bg-white dark:bg-zinc-800 border-gray-300"
+                    : "bg-gray-100 dark:bg-zinc-900 cursor-not-allowed"
+                } text-gray-800 dark:text-white`}
               >
                 <option value="">
-                  {cityOptions.length === 0 ? "Select a state first" : "Select City"}
+                  {cityOptions.length === 0
+                    ? "Select a state first"
+                    : "Select City"}
                 </option>
                 {cityOptions.map((city) => (
                   <option key={city.value} value={city.value}>
@@ -409,7 +460,11 @@ const Profile: React.FC = () => {
                 ))}
               </select>
             ) : (
-              <div className={inputClass(false)}>
+              <div
+                className={`w-full px-4 py-3 border rounded-md transition ${
+                  false ? "bg-white dark:bg-zinc-800 border-gray-300" : "bg-gray-100 dark:bg-zinc-900"
+                } text-gray-800 dark:text-white`}
+              >
                 {profile.cityName || ""}
               </div>
             )}

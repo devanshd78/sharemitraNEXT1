@@ -1,14 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, ChangeEvent, FormEvent } from "react";
 import Swal from "sweetalert2";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 
@@ -27,7 +21,7 @@ interface WalletData {
   availableToWithdraw: number;
 }
 
-const WalletPage = () => {
+const WalletPage: React.FC = () => {
   const [walletData, setWalletData] = useState<WalletData>({
     totalEarned: 0,
     availableToWithdraw: 0,
@@ -36,6 +30,8 @@ const WalletPage = () => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [userId, setUserId] = useState<string>("");
 
   const router = useRouter();
 
@@ -45,33 +41,47 @@ const WalletPage = () => {
     if (storedUser) {
       const parsed = JSON.parse(storedUser);
       if (parsed.userId) {
+        setUserId(parsed.userId);
         fetchWalletInfo(parsed.userId);
         fetchPaymentMethods(parsed.userId);
       }
     }
   }, []);
 
-  // Fetch wallet info from the API endpoint.
+  // Fetch wallet info from the API endpoint using centralized response.
   const fetchWalletInfo = async (userId: string) => {
     try {
-      const response = await fetch(
-        `http://127.0.0.1:5000/wallet/info?userId=${userId}`
-      );
-      const data = await response.json();
-      if (response.ok) {
-        // Assuming your API returns fields "total_earning" and "remaining_balance"
+      const response = await fetch(`http://127.0.0.1:5000/wallet/info?userId=${userId}`);
+      const json = await response.json();
+      if (response.ok && json.success) {
+        // Assuming API returns wallet fields with keys "total_earning" and "remaining_balance"
         setWalletData({
-          totalEarned: data.total_earning || 0,
-          availableToWithdraw: data.remaining_balance || 0,
+          totalEarned: json.data.total_earning || 0,
+          availableToWithdraw: json.data.remaining_balance || 0,
         });
       } else {
-        console.error("Error fetching wallet info:", data.error);
+        console.error("Error fetching wallet info:", json.message);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: json.message || "Failed to fetch wallet info",
+          timer: 1500,
+          showConfirmButton: false,
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching wallet info:", err);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: err.message || "Failed to fetch wallet info",
+        timer: 1500,
+        showConfirmButton: false,
+      });
     }
   };
 
+  // Fetch payment methods from the API endpoint using centralized response.
   const fetchPaymentMethods = async (userId: string) => {
     try {
       const response = await fetch("http://127.0.0.1:5000/payment/userdetail", {
@@ -79,16 +89,21 @@ const WalletPage = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
       });
-      const data = await response.json();
-      if (data.status === 200) {
-        setPaymentMethods(data.payments);
+      const json = await response.json();
+      if (response.ok && json.success) {
+        // Payment details are expected under json.data.payments.
+        setPaymentMethods(json.data.payments || []);
       } else {
+        console.error("Error fetching payment methods:", json.message);
         setPaymentMethods([]);
       }
     } catch (err) {
       console.error("Error fetching payment methods:", err);
+    } finally {
+      setLoading(false);
     }
   };
+
   const handleWithdrawConfirm = async () => {
     const amount = parseInt(withdrawAmount);
 
@@ -125,7 +140,6 @@ const WalletPage = () => {
       return;
     }
 
-    // Retrieve userId from localStorage
     const storedUser = localStorage.getItem("user");
     const user = storedUser ? JSON.parse(storedUser) : null;
     if (!user?.userId) {
@@ -139,7 +153,7 @@ const WalletPage = () => {
       return;
     }
 
-    // Find the selected payment method details to extract payment type
+    // Find the selected payment method details.
     const selectedPM = paymentMethods.find(
       (pm) => pm.paymentId === selectedPaymentMethod
     );
@@ -155,22 +169,18 @@ const WalletPage = () => {
     }
     const paymentType = selectedPM.paymentMethod; // 0 for UPI, 1 for Bank Transfer
 
-    // API call to withdraw funds from your Flask backend.
     try {
       const response = await fetch("http://127.0.0.1:5000/payout/withdraw", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.userId,
           amount: amount, // in rupees
           paymentType: paymentType,
         }),
       });
-
-      const data = await response.json();
-      if (response.status === 200) {
+      const json = await response.json();
+      if (response.ok && json.success) {
         Swal.fire({
           title: "Success",
           text: `₹${amount} withdrawal request submitted successfully.`,
@@ -181,13 +191,12 @@ const WalletPage = () => {
           setOpenPaymentDialog(false);
           setWithdrawAmount("");
           setSelectedPaymentMethod("");
-          // Optionally update wallet data by re-fetching from API.
           fetchWalletInfo(user.userId);
         });
       } else {
         Swal.fire({
           title: "Withdrawal Failed",
-          text: data.error || "Unable to process withdrawal request.",
+          text: json.message || "Unable to process withdrawal request.",
           icon: "error",
           timer: 1500,
           showConfirmButton: false,

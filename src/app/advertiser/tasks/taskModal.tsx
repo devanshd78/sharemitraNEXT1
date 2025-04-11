@@ -41,7 +41,6 @@ const TaskModal: React.FC<TaskModalProps> = ({
   formError,
   isEditing = false,
 }) => {
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -53,9 +52,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
             {isEditing ? "Edit Task" : "Add Task"}
           </DialogTitle>
         </DialogHeader>
+        {/* Global form error display */}
         {formError && <p className="text-red-500 mb-2 text-sm">{formError}</p>}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Title */}
+          {/* Title Field */}
           <div>
             <Label htmlFor="title" className="block text-sm font-medium text-gray-700">
               Title
@@ -70,7 +70,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
               className="mt-1"
             />
           </div>
-          {/* Description */}
+          {/* Description Field */}
           <div>
             <Label htmlFor="description" className="block text-sm font-medium text-gray-700">
               Description
@@ -83,7 +83,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
               className="mt-1"
             />
           </div>
-          {/* Message (URL) */}
+          {/* Message (URL) Field */}
           <div>
             <Label htmlFor="message" className="block text-sm font-medium text-gray-700">
               Message (URL)
@@ -98,7 +98,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
               className="mt-1"
             />
           </div>
-          {/* Task Amount */}
+          {/* Task Price Field */}
           <div>
             <Label htmlFor="task_price" className="block text-sm font-medium text-gray-700">
               Task Amount
@@ -113,7 +113,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
               className="mt-1"
             />
           </div>
-          {/* Hide Task Toggle */}
+          {/* Custom Toggle for Hide Task */}
           <div className="flex items-center space-x-3">
             <Label htmlFor="hidden" className="block text-sm font-medium text-gray-700">
               Hide Task
@@ -123,12 +123,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 formData.hidden ? 'bg-green-600' : 'bg-gray-300'
               }`}
               onClick={() => {
-                // Toggle the value manually when clicking on the custom toggle
+                // Toggle the hidden value (0 or 1)
                 const newValue = formData.hidden ? 0 : 1;
                 const syntheticEvent = {
                   target: {
                     name: 'hidden',
-                    value: newValue, // Send as number
+                    value: newValue,
                   },
                 } as unknown as React.ChangeEvent<HTMLInputElement>;
                 handleInputChange(syntheticEvent);
@@ -150,8 +150,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
               />
             </div>
           </div>
-
-          {/* Form Actions */}
+          {/* Form Action Buttons */}
           <div className="flex justify-end space-x-2">
             <DialogClose asChild>
               <Button variant="outline" disabled={creating}>

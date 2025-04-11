@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BadgeCheck, Clock, AlertTriangle } from "lucide-react";
+import Swal from "sweetalert2";
 
 interface Payout {
   payout_id: string;
@@ -11,7 +12,7 @@ interface Payout {
   status: string;
 }
 
-interface PayoutStatusResponse {
+interface PayoutStatusResponseData {
   userId: string;
   total_payouts: number;
   total_payout_amount: number;
@@ -19,11 +20,12 @@ interface PayoutStatusResponse {
 }
 
 const PaymentStatus: React.FC = () => {
-  const [payoutData, setPayoutData] = useState<PayoutStatusResponse | null>(null);
+  const [payoutData, setPayoutData] = useState<PayoutStatusResponseData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
+  // Get userId from localStorage on mount.
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -34,6 +36,7 @@ const PaymentStatus: React.FC = () => {
     }
   }, []);
 
+  // Fetch payout status from API using centralized response.
   useEffect(() => {
     if (!userId) return;
 
@@ -42,16 +45,33 @@ const PaymentStatus: React.FC = () => {
       setError(null);
       try {
         const response = await fetch(`http://127.0.0.1:5000/payout/status?userId=${userId}`);
-        const data = await response.json();
-        if (response.status === 200) {
-          setPayoutData(data);
-        } else {
-          setError(data.error || "No payouts found for this user.");
+        const json = await response.json();
+        if (!response.ok || !json.success) {
+          const errMsg = json.message || "No payouts found for this user.";
+          setError(errMsg);
           setPayoutData(null);
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: errMsg,
+            timer: 1500,
+            showConfirmButton: false,
+          });
+        } else {
+          // Using centralized response, data is inside json.data.
+          setPayoutData(json.data);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error fetching payout status:", err);
-        setError("Failed to fetch payout status.");
+        setError(err.message || "Failed to fetch payout status.");
+        setPayoutData(null);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: err.message || "Failed to fetch payout status.",
+          timer: 1500,
+          showConfirmButton: false,
+        });
       } finally {
         setLoading(false);
       }
@@ -61,7 +81,8 @@ const PaymentStatus: React.FC = () => {
   }, [userId]);
 
   const getStatusBadge = (status: string) => {
-    const base = "flex items-center gap-2 px-3 py-1 rounded-full text-xs sm:text-sm font-semibold";
+    const base =
+      "flex items-center gap-2 px-3 py-1 rounded-full text-xs sm:text-sm font-semibold";
     switch (status) {
       case "Processing":
         return (
@@ -84,7 +105,7 @@ const PaymentStatus: React.FC = () => {
       case "Processed":
         return (
           <span className={`${base} bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100`}>
-            <BadgeCheck size={14} /> Processed
+            <BadgeCheck size={14} /> Paid
           </span>
         );
       default:
@@ -104,12 +125,38 @@ const PaymentStatus: React.FC = () => {
         </h2>
 
         {loading ? (
-          <p className="text-center text-gray-600 dark:text-gray-400">Loading payout details...</p>
+          <div className="flex flex-col items-center justify-center">
+            <div className="flex items-center justify-center p-4">
+              <svg
+                className="animate-spin h-6 w-6 text-green-600"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                ></path>
+              </svg>
+              <span className="ml-2 text-green-600 font-medium">Loading...</span>
+            </div>
+          </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-10">
             <span className="text-6xl mb-4">💰</span>
-            <p className="text-lg text-gray-700 dark:text-gray-300">{error}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">No payout details available.</p>
+            <p className="text-lg text-red-500">{error}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              No payout details available.
+            </p>
           </div>
         ) : payoutData ? (
           <>
@@ -140,15 +187,24 @@ const PaymentStatus: React.FC = () => {
                     {payoutData.payouts.map((payout, idx) => (
                       <tr
                         key={payout.payout_id}
-                        className={`${
-                          idx % 2 === 0 ? "bg-white dark:bg-zinc-800" : "bg-green-50 dark:bg-zinc-700"
-                        } hover:bg-green-100 dark:hover:bg-zinc-600 transition`}
+                        className={`${idx % 2 === 0 ? "bg-white dark:bg-zinc-800" : "bg-green-50 dark:bg-zinc-700"
+                          } hover:bg-green-100 dark:hover:bg-zinc-600 transition`}
                       >
-                        <td className="px-4 sm:px-6 py-4 border-b font-medium">{idx + 1}</td>
-                        <td className="px-4 sm:px-6 py-4 border-b">{payout.payout_id}</td>
-                        <td className="px-4 sm:px-6 py-4 border-b">₹ {payout.amount}</td>
-                        <td className="px-4 sm:px-6 py-4 border-b">{payout.mode}</td>
-                        <td className="px-4 sm:px-6 py-4 border-b">{getStatusBadge(payout.status)}</td>
+                        <td className="px-4 sm:px-6 py-4 border-b font-medium">
+                          {idx + 1}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 border-b">
+                          {payout.payout_id}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 border-b">
+                          ₹ {payout.amount}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 border-b">
+                          {payout.mode}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 border-b">
+                          {getStatusBadge(payout.status)}
+                        </td>
                         <td className="px-4 sm:px-6 py-4 border-b whitespace-nowrap">
                           {new Date(payout.withdraw_time).toLocaleString()}
                         </td>

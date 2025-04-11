@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, FormEvent } from "react";
+import React, { useState, useEffect, FormEvent } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,11 +15,27 @@ import Swal from "sweetalert2";
 
 export default function Page() {
   const [open, setOpen] = useState(false);
+  const [adminId, setAdminId] = useState("");
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Retrieve adminId from localStorage key "user"
+  useEffect(() => {
+    const userFromStorage = localStorage.getItem("user");
+    if (userFromStorage) {
+      try {
+        const user = JSON.parse(userFromStorage);
+        if (user && user.adminId) {
+          setAdminId(user.adminId);
+        }
+      } catch (error) {
+        console.error("Failed to parse user data from localStorage");
+      }
+    }
+  }, []);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -30,14 +46,16 @@ export default function Page() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("http://127.0.0.1:5000/admin/update_credentials", {
+      const res = await fetch("http://127.0.0.1:5000/admin/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, newPassword }),
+        // We pass the adminId from localStorage along with email and new password.
+        body: JSON.stringify({ adminId, email, password: newPassword }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to update credentials");
+      // Check against the returnstatus key returned by the API.
+      if (data.returnstatus !== 200) {
+        throw new Error(data.Returnmessage || "Failed to update credentials");
       }
       Swal.fire("Success", "Login credentials updated successfully", "success");
       setOpen(false);

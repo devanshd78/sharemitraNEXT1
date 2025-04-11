@@ -97,17 +97,19 @@ const AdminDashboard = () => {
     },
   };
 
+  // ===================== API INTEGRATIONS =====================
+
   // Fetch Overview Data from API
   useEffect(() => {
     const fetchOverview = async () => {
       try {
         const res = await fetch("http://127.0.0.1:5000/dash/overview");
         const data = await res.json();
-        if (res.ok) {
-          setOverview(data);
+        if (res.ok && data.success) {
+          setOverview(data.data);
         } else {
-          Swal.fire("Error", data.error || "Overview API error", "error");
-          console.error("Overview API error:", data.error);
+          Swal.fire("Error", data.message || "Overview API error", "error");
+          console.error("Overview API error:", data.message);
         }
       } catch (e) {
         Swal.fire("Error", "Overview fetch error", "error");
@@ -128,11 +130,11 @@ const AdminDashboard = () => {
           body: JSON.stringify(payload),
         });
         const data = await res.json();
-        if (res.ok && data.graph) {
-          const labels = data.graph.map((item: any) =>
+        if (res.ok && data.success && data.data.graph) {
+          const labels = data.data.graph.map((item: any) =>
             item.date ? item.date : `Week ${item.week}`
           );
-          const totals = data.graph.map((item: any) => item.total);
+          const totals = data.data.graph.map((item: any) => item.total);
           setExpenseGraph({
             labels,
             datasets: [
@@ -143,10 +145,11 @@ const AdminDashboard = () => {
                 backgroundColor: "rgba(75,192,192,0.6)",
                 tension: 0.1,
                 borderColor:"rgba(75,192,192,0.6)"
-                
               },
             ],
           });
+        } else if (!data.success) {
+          Swal.fire("Error", data.message || "Expense API error", "error");
         }
       } catch (e) {
         Swal.fire("Error", "Expense fetch error", "error");
@@ -167,11 +170,11 @@ const AdminDashboard = () => {
           body: JSON.stringify(payload),
         });
         const data = await res.json();
-        if (res.ok && data.graph) {
-          const labels = data.graph.map((item: any) =>
+        if (res.ok && data.success && data.data.graph) {
+          const labels = data.data.graph.map((item: any) =>
             item.date ? item.date : `Week ${item.week}`
           );
-          const totals = data.graph.map((item: any) => item.total);
+          const totals = data.data.graph.map((item: any) => item.total);
           setRegistrationGraph({
             labels,
             datasets: [
@@ -185,6 +188,8 @@ const AdminDashboard = () => {
               },
             ],
           });
+        } else if (!data.success) {
+          Swal.fire("Error", data.message || "Registration API error", "error");
         }
       } catch (e) {
         Swal.fire("Error", "Registration fetch error", "error");
@@ -205,11 +210,11 @@ const AdminDashboard = () => {
           body: JSON.stringify(payload),
         });
         const data = await res.json();
-        if (res.ok && data.graph) {
-          const labels = data.graph.map((item: any) =>
+        if (res.ok && data.success && data.data.graph) {
+          const labels = data.data.graph.map((item: any) =>
             item.date ? item.date : `Week ${item.week}`
           );
-          const totals = data.graph.map((item: any) => item.total);
+          const totals = data.data.graph.map((item: any) => item.total);
           setTasksCompletedGraph({
             labels,
             datasets: [
@@ -223,6 +228,8 @@ const AdminDashboard = () => {
               },
             ],
           });
+        } else if (!data.success) {
+          Swal.fire("Error", data.message || "Tasks Completed API error", "error");
         }
       } catch (e) {
         Swal.fire("Error", "Tasks Completed fetch error", "error");
@@ -243,12 +250,14 @@ const AdminDashboard = () => {
           body: JSON.stringify(payload),
         });
         const data = await res.json();
-        if (res.ok) {
-          setTodayTasksCompletedMetric(data.total_completed);
+        if (res.ok && data.success) {
+          setTodayTasksCompletedMetric(data.data.total_completed);
+        } else if (!data.success) {
+          Swal.fire("Error", data.message || "Tasks Completed Summary error", "error");
         }
       } catch (e) {
-        Swal.fire("Error", "Today Tasks Completed fetch error", "error");
-        console.error("Today Tasks Completed fetch error:", e);
+        Swal.fire("Error", "Tasks Completed Summary fetch error", "error");
+        console.error("Tasks Completed Summary fetch error:", e);
       }
     };
     fetchTodayTasksCompleted();
@@ -265,18 +274,21 @@ const AdminDashboard = () => {
           body: JSON.stringify(payload),
         });
         const data = await res.json();
-        if (res.ok) {
-          setTodayRegistrationsMetric(data.total_registrations);
+        if (res.ok && data.success) {
+          setTodayRegistrationsMetric(data.data.total_registrations);
+        } else if (!data.success) {
+          Swal.fire("Error", data.message || "Users Registered Summary error", "error");
         }
       } catch (e) {
-        Swal.fire("Error", "Today Registrations fetch error", "error");
-        console.error("Today Registrations fetch error:", e);
+        Swal.fire("Error", "Users Registered Summary fetch error", "error");
+        console.error("Users Registered Summary fetch error:", e);
       }
     };
     fetchTodayRegistrations();
   }, [todayRegistrationsStartDate, todayRegistrationsEndDate]);
 
-  // Dynamic Titles for Second Row Cards
+  // ===================== Dynamic Titles =====================
+
   const tasksCompletedTitle =
     todayTasksCompletedStartDate === todayTasksCompletedEndDate
       ? "Tasks Completed Today"
@@ -287,11 +299,12 @@ const AdminDashboard = () => {
       ? "Users Registered Today"
       : `Users Registered from ${todayRegistrationsStartDate} to ${todayRegistrationsEndDate}`;
 
+  // ===================== Render JSX =====================
   return (
     <div className="p-8 space-y-8">
       <h1 className="text-4xl font-bold text-center">Advertiser Dashboard</h1>
 
-      {/* First Row: Summary Cards for Total Users, Total Tasks, & Expense */}
+      {/* First Row: Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="shadow-lg">
           <CardHeader>
@@ -327,7 +340,7 @@ const AdminDashboard = () => {
         </Card>
       </div>
 
-      {/* Second Row: Summary Cards for Tasks Completed & Users Registered Today (or by selected range) */}
+      {/* Second Row: Summary Cards for Tasks Completed & Users Registered */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Tasks Completed Summary */}
         <Card className="shadow-lg">

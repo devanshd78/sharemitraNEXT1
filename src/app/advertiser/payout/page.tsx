@@ -26,9 +26,16 @@ interface Payout {
   status: string;
 }
 
-interface PayoutResponse {
+interface PayoutData {
   payouts: Payout[];
   total: number;
+}
+
+interface PayoutResponse {
+  success: boolean;
+  message: string;
+  data: PayoutData;
+  status: number;
 }
 
 const PayoutHistory: React.FC = () => {
@@ -42,7 +49,7 @@ const PayoutHistory: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
 
-  // Fetch payout history using a POST request
+  // Fetch payout history with updated integration.
   const fetchPayoutHistory = async () => {
     setLoading(true);
     setError(null);
@@ -53,24 +60,25 @@ const PayoutHistory: React.FC = () => {
         body: JSON.stringify({
           page: currentPage - 1, // backend expects zero-indexed page
           per_page: rowsPerPage,
-          searchquery: searchQuery.trim()
+          searchquery: searchQuery.trim(),
         }),
       });
       const data: PayoutResponse = await res.json();
-      if (!res.ok) {
-        throw new Error(data ? data.toString() : "Failed to fetch payout history");
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to fetch payout history");
       }
-      setPayouts(data.payouts);
-      setTotalRows(data.total);
+      // Set the payout list and total rows from the centralized response
+      setPayouts(data.data.payouts);
+      setTotalRows(data.data.total);
     } catch (err: any) {
-      console.error(err);
+      console.error("Error fetching payout history:", err);
       setError(err.message);
+      Swal.fire("Error", err.message, "error");
     } finally {
       setLoading(false);
     }
   };
 
-  // Trigger fetch when page, rowsPerPage, or searchQuery changes
   useEffect(() => {
     fetchPayoutHistory();
   }, [currentPage, rowsPerPage, searchQuery]);
@@ -87,35 +95,32 @@ const PayoutHistory: React.FC = () => {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
   };
 
-  // Download Excel via API endpoint
-  const handleExportExcel = () => {
+  // Download Excel via the API endpoint.
+  const handleExportExcel = async () => {
     if (totalRows === 0) {
       Swal.fire("No payouts", "There are no payout records to export.", "info");
       return;
     }
-    fetch("http://127.0.0.1:5000/download/payouts", {
-      method: "GET",
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("Failed to download payouts");
-        }
-        return response.blob();
-      })
-      .then((blob) => {
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = "payout.xlsx";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      })
-      .catch((error) => {
-        console.error("Error exporting payouts:", error);
-        Swal.fire("Error", "Failed to export payouts.", "error");
+    try {
+      const response = await fetch("http://127.0.0.1:5000/download/payouts", {
+        method: "GET",
       });
+      if (!response.ok) {
+        throw new Error("Failed to download payouts");
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "payout.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      console.error("Error exporting payouts:", error);
+      Swal.fire("Error", error.message || "Failed to export payouts.", "error");
+    }
   };
 
   return (
@@ -129,7 +134,6 @@ const PayoutHistory: React.FC = () => {
         <CardContent>
           {/* Controls: Search, Rows Per Page, and Export Button */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
-            {/* Search Input */}
             <Input
               placeholder="Search by User ID or Name..."
               value={searchQuery}
@@ -139,7 +143,6 @@ const PayoutHistory: React.FC = () => {
               }}
               className="sm:w-1/3"
             />
-            {/* Rows Per Page and Download Button */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <label htmlFor="rowsPerPage" className="text-green-700 font-medium">
@@ -170,70 +173,133 @@ const PayoutHistory: React.FC = () => {
               </Button>
             </div>
           </div>
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>No.</TableHead>
-                  <TableHead>User ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Payout ID</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Withdraw Time</TableHead>
-                  <TableHead>Mode</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {payouts.map((payout, index) => (
-                  <TableRow key={payout.payout_id}>
-                    <TableCell>{(currentPage - 1) * rowsPerPage + index + 1}</TableCell>
-                    <TableCell>{payout.userId}</TableCell>
-                    <TableCell>{payout.name}</TableCell>
-                    <TableCell>{payout.payout_id}</TableCell>
-                    <TableCell>₹ {payout.amount}</TableCell>
-                    <TableCell>{new Date(payout.withdraw_time).toLocaleString()}</TableCell>
-                    <TableCell>{payout.mode}</TableCell>
-                    <TableCell>{payout.status}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <TableCaption>
-                {totalRows > 0 ? (
-                  <span>
+
+          {loading ? (
+            <div className="flex flex-col items-center justify-center">
+              <div className="flex items-center justify-center p-4">
+                <svg
+                  className="animate-spin h-6 w-6 text-green-600"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  ></path>
+                </svg>
+                <span className="ml-2 text-green-600 font-medium">Loading...</span>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-10">
+              <span className="text-6xl mb-4">💰</span>
+              <p className="text-lg text-red-500">{error}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                No payout details available.
+              </p>
+            </div>
+          ) : payouts && payouts.length > 0 ? (
+            <>
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-lg font-semibold">Total Payouts:</span>
+                  <span className="text-xl font-bold">{totalRows}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-semibold">Total Payout Amount:</span>
+                  <span className="text-xl font-bold">
+                    ₹ {payouts.reduce((acc, cur) => acc + cur.amount, 0)}
+                  </span>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>No.</TableHead>
+                      <TableHead>User ID</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Payout ID</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Withdraw Time</TableHead>
+                      <TableHead>Mode</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payouts.map((payout, index) => (
+                      <TableRow key={payout.payout_id}>
+                        <TableCell>
+                          {(currentPage - 1) * rowsPerPage + index + 1}
+                        </TableCell>
+                        <TableCell>{payout.userId}</TableCell>
+                        <TableCell>{payout.name}</TableCell>
+                        <TableCell>{payout.payout_id}</TableCell>
+                        <TableCell>₹ {payout.amount}</TableCell>
+                        <TableCell>
+                          {new Date(payout.withdraw_time).toLocaleString()}
+                        </TableCell>
+                        <TableCell>{payout.mode}</TableCell>
+                        <TableCell>{payout.status}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableCaption>
+                    {totalRows > 0 ? (
+                      <span>
+                        Showing {showingFrom} to {showingTo} of {totalRows} records
+                      </span>
+                    ) : (
+                      <span>No payout records found.</span>
+                    )}
+                  </TableCaption>
+                </Table>
+              </div>
+              <div className="flex flex-col sm:flex-row items-center justify-between mt-4">
+                <div>
+                  <span className="text-sm">
                     Showing {showingFrom} to {showingTo} of {totalRows} records
                   </span>
-                ) : (
-                  <span>No payout records found.</span>
-                )}
-              </TableCaption>
-            </Table>
-          </div>
-          {/* Pagination Controls */}
-          <div className="flex flex-col sm:flex-row items-center justify-between mt-4">
-            <div>
-              <span className="text-sm">
-                Showing {showingFrom} to {showingTo} of {totalRows} records
-              </span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Button
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                    className="bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    className="bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-10">
+              <span className="text-6xl mb-4">💰</span>
+              <p className="text-lg text-gray-700 dark:text-gray-300">
+                No payout details available!
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Your payouts will be displayed here once processed.
+              </p>
             </div>
-            <div className="flex items-center gap-4">
-              <Button
-                onClick={handlePreviousPage}
-                disabled={currentPage === 1}
-                className="bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-              >
-                Previous
-              </Button>
-              <Button
-                onClick={handleNextPage}
-                disabled={currentPage === totalPages || totalPages === 0}
-                className="bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

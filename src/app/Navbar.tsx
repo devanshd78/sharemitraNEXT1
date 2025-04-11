@@ -114,7 +114,7 @@ const Navbar: React.FC<NavbarProps> = ({ walletBalance }) => {
                   className="w-8 h-8 rounded-full mr-2"
                 />
                 <span className="text-gray-700 text-sm font-medium">
-                {user.name} | ₹ {walletBalance}
+                {user.name}
                 </span>
               </button>
 
@@ -126,7 +126,7 @@ const Navbar: React.FC<NavbarProps> = ({ walletBalance }) => {
                       <button
                         onClick={() => {
                           setDropdownOpen(false);
-                          router.push("/my-account/profile");
+                          router.push("/my-account/latest-task");
                         }}
                         className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 cursor-pointer"
                       >

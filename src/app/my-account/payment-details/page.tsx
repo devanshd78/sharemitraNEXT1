@@ -1,15 +1,15 @@
-"use client"
+"use client";
 
 import React, { useState, useEffect, FormEvent, ChangeEvent } from "react";
 import Swal from "sweetalert2";
 import { FaChevronDown, FaChevronUp, FaEdit, FaTrash } from "react-icons/fa";
 import PaymentModal from "./paymentModal"; // Adjust the import path as necessary
 
-// Define your PaymentMethod interface and any other types here
+// Define your PaymentMethod interface
 interface PaymentMethod {
   paymentId: string;
   userId: string;
-  paymentMethod: number; // 1 for bank, other for UPI
+  paymentMethod: number; // 1 for bank, 0 for UPI
   accountHolder?: string;
   accountNumber?: string;
   ifsc?: string;
@@ -30,10 +30,12 @@ const PaymentPage: React.FC = () => {
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const [userId, setUserId] = useState<string>("");
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [expandedPayment, setExpandedPayment] = useState<string | null>(null);
   const [editingPayment, setEditingPayment] = useState<PaymentMethod | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
 
+  // Fetch user from local storage on mount.
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -45,21 +47,41 @@ const PaymentPage: React.FC = () => {
     }
   }, []);
 
+  // Fetch payment methods using centralized API response.
   const fetchPaymentMethods = async (userId: string) => {
+    setLoading(true);
     try {
       const response = await fetch("http://127.0.0.1:5000/payment/userdetail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
       });
-      const data = await response.json();
-      if (data.status === 200) {
-        setPaymentMethods(data.payments);
-      } else {
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: json.message || "Failed to fetch payment methods",
+          timer: 1500,
+          showConfirmButton: false,
+        });
         setPaymentMethods([]);
+      } else {
+        // Expecting centralized response: payment details under json.data.payments.
+        setPaymentMethods(json.data.payments || []);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching payment methods:", err);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: err.response?.data?.message || err.message || "Error fetching payment methods",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      setPaymentMethods([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -111,6 +133,7 @@ const PaymentPage: React.FC = () => {
     setShowModal(true);
   };
 
+  // Handle submission of payment details.
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -135,22 +158,22 @@ const PaymentPage: React.FC = () => {
         : { userId, paymentMethod: "upi", upiId: upiDetails.upiId };
 
     try {
-      const res = await fetch("http://127.0.0.1:5000/payment/payment-details", {
+      const res = await fetch("http://127.0.0.1:5000/payment/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
 
-      if (res.ok) {
-        Swal.fire("Success", data.msg, "success");
+      if (res.ok && data.success) {
+        Swal.fire("Success", data.message, "success");
         setEditingPayment(null);
         setBankDetails({ accountHolder: "", accountNumber: "", ifsc: "", bankName: "" });
         setUpiDetails({ upiId: "" });
-        fetchPaymentMethods(userId);
+        fetchPaymentMethods(userId); // Refresh payment methods
         setShowModal(false);
       } else {
-        Swal.fire("Error", data.msg, "error");
+        Swal.fire("Error", data.message || "Error submitting payment details", "error");
       }
     } catch {
       Swal.fire("Error", "Submission failed.", "error");
@@ -176,18 +199,17 @@ const PaymentPage: React.FC = () => {
     if (confirmDelete.isConfirmed) {
       try {
         const res = await fetch("http://127.0.0.1:5000/payment/delete", {
-          method: "POST", // Using POST instead of DELETE
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId, paymentId }),
         });
-
         const data = await res.json();
 
-        if (res.ok) {
-          Swal.fire("Deleted!", data.msg, "success");
-          fetchPaymentMethods(userId); // Refresh payment methods
+        if (res.ok && data.success) {
+          Swal.fire("Deleted!", data.message, "success");
+          fetchPaymentMethods(userId);
         } else {
-          Swal.fire("Error", data.msg, "error");
+          Swal.fire("Error", data.message || "Error deleting payment method", "error");
         }
       } catch (error) {
         Swal.fire("Error", "Failed to delete the payment method.", "error");
@@ -210,7 +232,33 @@ const PaymentPage: React.FC = () => {
             Add Payment Method
           </button>
         </div>
-        {paymentMethods.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center">
+            <div className="flex items-center justify-center p-4">
+              <svg
+                className="animate-spin h-6 w-6 text-green-600"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                ></path>
+              </svg>
+              <span className="ml-2 text-green-600 font-medium">Loading...</span>
+            </div>
+          </div>
+        ) : paymentMethods.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10">
             <span className="text-6xl mb-4">💳</span>
             <p className="text-lg text-gray-700 dark:text-gray-300">
@@ -220,11 +268,13 @@ const PaymentPage: React.FC = () => {
               Please add your preferred payment method to start receiving payouts.
             </p>
           </div>
-
         ) : (
           <div className="grid gap-4">
             {paymentMethods.map((payment) => (
-              <div key={payment.paymentId} className="bg-white dark:bg-zinc-800 border border-green-200 dark:border-green-700 rounded-xl shadow-sm hover:shadow-md transition p-4">
+              <div
+                key={payment.paymentId}
+                className="bg-white dark:bg-zinc-800 border border-green-200 dark:border-green-700 rounded-xl shadow-sm hover:shadow-md transition p-4"
+              >
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <h3 className="text-lg font-semibold text-green-900 dark:text-green-200">
@@ -244,7 +294,11 @@ const PaymentPage: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     <button
-                      onClick={() => setExpandedPayment(expandedPayment === payment.paymentId ? null : payment.paymentId)}
+                      onClick={() =>
+                        setExpandedPayment(
+                          expandedPayment === payment.paymentId ? null : payment.paymentId
+                        )
+                      }
                       className="text-green-600 dark:text-green-300 hover:text-green-800"
                     >
                       {expandedPayment === payment.paymentId ? <FaChevronUp /> : <FaChevronDown />}
@@ -311,6 +365,6 @@ const PaymentPage: React.FC = () => {
       />
     </div>
   );
-};
+}
 
 export default PaymentPage;

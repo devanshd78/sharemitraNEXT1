@@ -1,55 +1,163 @@
 "use client";
 
-import React, { useState, FormEvent } from "react";
+import React, { useState, useEffect, FormEvent, ChangeEvent } from "react";
+import axios from "axios";
+import Swal from "sweetalert2";
+
+interface StateOption {
+  stateId: string;
+  state: string;
+  cities: { cityId: string; name: string }[];
+}
 
 const Contact: React.FC = () => {
-  // Consistent styling classes for all fields
+  // Base styling for inputs
   const baseInputClass =
     "w-full px-4 py-3 border border-gray-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-400";
   const inputClass = baseInputClass;
   const selectClass = baseInputClass;
   const textareaClass = baseInputClass;
 
+  // Updated form state including IDs and names for state and city
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     subject: "",
     message: "",
     phoneNumber: "",
-    state: "",
-    city: "",
-    employmentStatus: "",
-    profession: "",
-    companyName: "",
-    businessName: "",
-    businessAddress: "",
+    stateId: "",
+    stateName: "",
+    cityId: "",
+    cityName: "",
+    address: "",
   });
 
-  const [states] = useState([
-    { name: "Andhra Pradesh", cities: ["Visakhapatnam", "Vijayawada", "Guntur"] },
-    { name: "Maharashtra", cities: ["Mumbai", "Pune", "Nagpur"] },
-    { name: "Karnataka", cities: ["Bengaluru", "Mysuru", "Mangaluru"] },
-  ]);
-  const [cities, setCities] = useState<string[]>([]);
+  // State options fetched from API
+  const [stateOptions, setStateOptions] = useState<StateOption[]>([]);
+  // City options for selected state
+  const [cityOptions, setCityOptions] = useState<{ cityId: string; name: string }[]>([]);
 
+  // Fetch states and cities from API on mount.
+  useEffect(() => {
+    axios
+      .get("http://127.0.0.1:5000/contact/india_states")
+      .then((res) => {
+        // Expected API response structure:
+        // { success: true, message: "...", data: { states: [ { stateId, state, cities: [ { cityId, name } ] } ] } }
+        if (res.data && res.data.success) {
+          setStateOptions(res.data.data.states);
+        } else {
+          console.error("Failed to fetch states:", res.data.message);
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching states:", err);
+      });
+  }, []);
+
+  // Custom handler for state selection.
+  const handleStateChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const selectedStateId = e.target.value;
+    // Find the selected state object.
+    const selectedState = stateOptions.find((s) => s.stateId === selectedStateId);
+    setFormData((prev) => ({
+      ...prev,
+      stateId: selectedStateId,
+      stateName: selectedState ? selectedState.state : "",
+      // Reset city fields when state changes.
+      cityId: "",
+      cityName: "",
+    }));
+    setCityOptions(selectedState ? selectedState.cities : []);
+  };
+
+  // Custom handler for city selection.
+  const handleCityChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    const selectedCityId = e.target.value;
+    const selectedCity = cityOptions.find((city) => city.cityId === selectedCityId);
+    setFormData((prev) => ({
+      ...prev,
+      cityId: selectedCityId,
+      cityName: selectedCity ? selectedCity.name : "",
+    }));
+  };
+
+  // General handleChange for other inputs.
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-
-    // When the state changes, update the cities and reset the selected city.
-    if (name === "state") {
-      const selectedState = states.find((state) => state.name === value);
-      setCities(selectedState ? selectedState.cities : []);
-      setFormData((prev) => ({ ...prev, city: "" }));
-    }
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    console.log("Contact form submitted:", formData);
+  
+    // Create payload with keys expected by the backend.
+    const payload = {
+      fullname: formData.fullName,
+      email: formData.email,
+      phonemumber: formData.phoneNumber,
+      subject: formData.subject,
+      message: formData.message,
+      stateId: formData.stateId,
+      state: formData.stateName,
+      cityId: formData.cityId,
+      city: formData.cityName,
+      address: formData.address,
+    };
+  
+    axios
+      .post("http://127.0.0.1:5000/contact/store", payload, {
+        headers: { "Content-Type": "application/json" },
+      })
+      .then((res) => {
+        if (res.data && res.data.success) {
+          // Show SweetAlert success notification.
+          Swal.fire({
+            icon: "success",
+            title: "Success",
+            text: res.data.message,
+            timer: 1500,
+            showConfirmButton: false,
+          });
+          setFormData({
+            fullName: "",
+            email: "",
+            subject: "",
+            message: "",
+            phoneNumber: "",
+            stateId: "",
+            stateName: "",
+            cityId: "",
+            cityName: "",
+            address: "",
+          });
+        } else {
+          // Show SweetAlert error notification if API returns failure.
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: res.data.message || "Submission error",
+            timer: 1500,
+            showConfirmButton: false,
+          });
+          console.error("Submission error: ", res.data.message);
+        }
+      })
+      .catch((err) => {
+        // Handle errors from the API or network issues.
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: err.response?.data?.message || err.message,
+          timer: 1500,
+          showConfirmButton: false,
+        });
+        console.error("Failed to submit contact form:", err.response?.data || err.message);
+      });
   };
+  
 
   return (
     <div className="min-h-screen bg-green-50 dark:bg-zinc-950 py-24 px-4 text-gray-800 dark:text-gray-100">
@@ -111,80 +219,18 @@ const Contact: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-              Employment Status <span className="text-red-500">*</span>
+              Address <span className="text-red-500">*</span>
             </label>
-            <select
-              name="employmentStatus"
-              value={formData.employmentStatus}
+            <input
+              type="text"
+              name="address"
+              placeholder="123 Main St"
+              value={formData.address}
               onChange={handleChange}
               required
-              className={selectClass}
-            >
-              <option value="">Select Status</option>
-              <option value="Employed">Employed</option>
-              <option value="Unemployed">Unemployed</option>
-              <option value="Self-Employed">Self-Employed</option>
-              <option value="Student">Student</option>
-            </select>
-          </div>
-          {(formData.employmentStatus === "Employed" ||
-            formData.employmentStatus === "Self-Employed") && (
-            <>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                  Business Name
-                </label>
-                <input
-                  type="text"
-                  name="businessName"
-                  placeholder="Your Business Name"
-                  value={formData.businessName}
-                  onChange={handleChange}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                  Business Address
-                </label>
-                <input
-                  type="text"
-                  name="businessAddress"
-                  placeholder="Your Business Address"
-                  value={formData.businessAddress}
-                  onChange={handleChange}
-                  className={inputClass}
-                />
-              </div>
-            </>
-          )}
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-              Profession
-            </label>
-            <input
-              type="text"
-              name="profession"
-              placeholder="Your Profession"
-              value={formData.profession}
-              onChange={handleChange}
               className={inputClass}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-              Company Name
-            </label>
-            <input
-              type="text"
-              name="companyName"
-              placeholder="Your Company Name"
-              value={formData.companyName}
-              onChange={handleChange}
-              className={inputClass}
-            />
-          </div>
-
           {/* Right Column Fields */}
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
@@ -214,21 +260,22 @@ const Contact: React.FC = () => {
               className={textareaClass}
             ></textarea>
           </div>
+          {/* State and City Selections */}
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
               State <span className="text-red-500">*</span>
             </label>
             <select
-              name="state"
-              value={formData.state}
-              onChange={handleChange}
+              name="stateId"
+              value={formData.stateId}
+              onChange={handleStateChange}
               required
               className={selectClass}
             >
               <option value="">Select State</option>
-              {states.map((state, index) => (
-                <option key={index} value={state.name}>
-                  {state.name}
+              {stateOptions.map((state) => (
+                <option key={state.stateId} value={state.stateId}>
+                  {state.state}
                 </option>
               ))}
             </select>
@@ -238,17 +285,17 @@ const Contact: React.FC = () => {
               City <span className="text-red-500">*</span>
             </label>
             <select
-              name="city"
-              value={formData.city}
-              onChange={handleChange}
-              disabled={!formData.state}
+              name="cityId"
+              value={formData.cityId}
+              onChange={handleCityChange}
+              disabled={!formData.stateId}
               required
-              className={`${selectClass} ${!formData.state ? "bg-gray-200 dark:bg-zinc-600 cursor-not-allowed" : ""}`}
+              className={`${selectClass} ${!formData.stateId ? "bg-gray-200 dark:bg-zinc-600 cursor-not-allowed" : ""}`}
             >
               <option value="">Select City</option>
-              {cities.map((city, index) => (
-                <option key={index} value={city}>
-                  {city}
+              {cityOptions.map((city) => (
+                <option key={city.cityId} value={city.cityId}>
+                  {city.name}
                 </option>
               ))}
             </select>
@@ -263,7 +310,6 @@ const Contact: React.FC = () => {
             </button>
           </div>
         </form>
-
       </div>
     </div>
   );

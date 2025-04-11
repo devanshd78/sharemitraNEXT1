@@ -11,7 +11,15 @@ import {
   TableCell,
   TableBody,
 } from "@/components/ui/table";
-import { FiEdit, FiTrash2, FiChevronUp, FiChevronDown, FiDownload, FiEye, FiEyeOff } from "react-icons/fi";
+import {
+  FiEdit,
+  FiTrash2,
+  FiChevronUp,
+  FiChevronDown,
+  FiDownload,
+  FiEye,
+  FiEyeOff,
+} from "react-icons/fi";
 import Swal from "sweetalert2";
 
 interface Task {
@@ -73,19 +81,19 @@ const TasksPage: React.FC = () => {
           keyword: debouncedSearchQuery,
           page: currentPage - 1, // Backend expects zero-indexed page
           per_page: rowsPerPage,
-          // If your backend supports sorting, you can send sortField and sortOrder here.
           sortField,
           sortOrder,
         }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Failed to load tasks.");
+      if (!res.ok || !data.success) {
+        setError(data.message || "Failed to load tasks.");
       } else {
-        setTasks(data.tasks);
-        setTotalRows(data.total);
+        // Use data.data as per our centralized response.
+        setTasks(data.data.tasks);
+        setTotalRows(data.data.total);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setError("An error occurred while fetching tasks.");
     } finally {
@@ -125,8 +133,8 @@ const TasksPage: React.FC = () => {
           body: JSON.stringify({ taskId: editingTaskId, ...formData }),
         });
         const data = await res.json();
-        if (!res.ok) {
-          setFormError(data.error || "Failed to update task");
+        if (!res.ok || !data.success) {
+          setFormError(data.message || "Failed to update task");
         } else {
           fetchTasks();
           setOpen(false);
@@ -142,8 +150,8 @@ const TasksPage: React.FC = () => {
           body: JSON.stringify(formData),
         });
         const data = await res.json();
-        if (!res.ok) {
-          setFormError(data.error || "Failed to create task");
+        if (!res.ok || !data.success) {
+          setFormError(data.message || "Failed to create task");
         } else {
           fetchTasks();
           setOpen(false);
@@ -192,11 +200,11 @@ const TasksPage: React.FC = () => {
           body: JSON.stringify({ taskId: task.taskId }),
         });
         const data = await res.json();
-        if (res.ok) {
+        if (res.ok && data.success) {
           Swal.fire("Deleted!", data.message || "Task deleted successfully.", "success");
           fetchTasks();
         } else {
-          Swal.fire("Error", data.error, "error");
+          Swal.fire("Error", data.message || "Failed to delete task.", "error");
         }
       } catch (error) {
         Swal.fire("Error", "Failed to delete the task.", "error");
@@ -226,11 +234,11 @@ const TasksPage: React.FC = () => {
           body: JSON.stringify({ taskId: task.taskId, isHide: newHidden }),
         });
         const data = await res.json();
-        if (res.ok) {
+        if (res.ok && data.success) {
           Swal.fire("Updated!", data.message || "Task updated successfully.", "success");
           fetchTasks();
         } else {
-          Swal.fire("Error", data.error, "error");
+          Swal.fire("Error", data.message || "Failed to update task.", "error");
         }
       } catch (error) {
         Swal.fire("Error", "Failed to update task.", "error");
@@ -276,11 +284,9 @@ const TasksPage: React.FC = () => {
         if (!response.ok) {
           throw new Error("Network response was not ok");
         }
-        // Convert the response into a blob
         return response.blob();
       })
       .then((blob) => {
-        // Create a temporary URL for the blob
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
@@ -288,7 +294,6 @@ const TasksPage: React.FC = () => {
         document.body.appendChild(link); // Required for Firefox
         link.click();
         document.body.removeChild(link);
-        // Optionally revoke the object URL later:
         window.URL.revokeObjectURL(url);
       })
       .catch((error) => {
@@ -356,7 +361,31 @@ const TasksPage: React.FC = () => {
 
       {/* Task Table */}
       {loading ? (
-        <p>Loading tasks...</p>
+        <div className="flex flex-col items-center justify-center">
+          <div className="flex items-center justify-center p-4">
+            <svg
+              className="animate-spin h-6 w-6 text-green-600"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              ></path>
+            </svg>
+            <span className="ml-2 text-green-600 font-medium">Loading...</span>
+          </div>
+        </div>
       ) : error ? (
         <p className="text-red-500">{error}</p>
       ) : (
@@ -451,7 +480,7 @@ const TasksPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-center justify-between mt-4">
         <div>
           <span className="text-sm">
-            Showing {showingFrom} to {showingTo} of {totalRows} tasks
+            Showing {(totalRows === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1)} to {Math.min(currentPage * rowsPerPage, totalRows)} of {totalRows} tasks
           </span>
         </div>
         <div className="flex items-center gap-4">

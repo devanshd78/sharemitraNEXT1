@@ -42,7 +42,7 @@ export interface LoginModalProps {
 const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
   const router = useRouter();
 
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(false);
 
   // Login states for OTP-based login
   const [loginData, setLoginData] = useState<LoginData>({
@@ -75,24 +75,36 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
 
   const [errors, setErrors] = useState<Errors>({});
 
+  const routerInstance = useRouter();
+
+  // Fetch state options on mount
   useEffect(() => {
     axios
       .get("http://127.0.0.1:5000/contact/india_states")
       .then((res) => {
-        if (res.data && res.data.states) {
-          const options: StateOption[] = res.data.states.map((state: any) => ({
-            value: state.stateId,   // using stateId as the option value
-            label: state.state,     // using state name as the label
-            cities: state.cities || [],
+        if (res.data && res.data.success) {
+          const options: StateOption[] = res.data.data.states.map((state: any) => ({
+            value: state.stateId,
+            label: state.state,
+            cities: (state.cities || []).map((city: any) => ({
+              cityId: city.cityId,
+              name: city.name,
+            })),
           }));
+          console.log("State options:", options);
           setStateOptions(options);
+        } else {
+          console.error("Failed to fetch states:", res.data.message);
         }
       })
-      .catch((err) => console.error("Error fetching states:", err));
+      .catch((err) => {
+        console.error("Error fetching state options:", err);
+      });
   }, []);
+  
 
   useEffect(() => {
-    // Check ?ref= in URL and store in localStorage if present
+    // Check ?ref= in URL and store in localStorage if present.
     const urlParams = new URLSearchParams(window.location.search);
     const ref = urlParams.get("ref");
     if (ref) {
@@ -101,28 +113,28 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
     }
   }, []);
 
-  // Validate login
+  // Validate login fields
   const validateLogin = (): boolean => {
     const tempErrors: Errors = {};
-    if (!loginData.identifier)
+    if (!loginData.identifier) {
       tempErrors.identifier = "Email or Phone is required";
+    }
     setErrors(tempErrors);
     return Object.keys(tempErrors).length === 0;
   };
 
-  // Validate signup for the current step
+  // Validate signup based on current step
   const validateSignup = (): boolean => {
     const tempErrors: Errors = {};
     if (signupStep === 1) {
       if (!signupData.name) tempErrors.name = "Full Name is required";
       if (!signupData.email) tempErrors.email = "Email is required";
-      if (!emailVerified) tempErrors.emailOtp = "Email not verified";
+      //if (!emailVerified) tempErrors.emailOtp = "Email not verified";
     } else if (signupStep === 2) {
       if (!signupData.phone) tempErrors.phone = "Phone number is required";
       if (!phoneVerified) tempErrors.phoneOtp = "Phone not verified";
     } else if (signupStep === 3) {
-      if (!signupData.dob)
-        tempErrors.dob = "Date of Birth is required";
+      if (!signupData.dob) tempErrors.dob = "Date of Birth is required";
       if (!signupData.stateId) tempErrors.state = "State is required";
       if (!signupData.cityId) tempErrors.city = "City is required";
     }
@@ -130,7 +142,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
     return Object.keys(tempErrors).length === 0;
   };
 
-  // Handle input changes for both login and signup
+  // Handle input changes
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     if (isLogin) {
@@ -143,27 +155,29 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
   };
 
   // ----- Login OTP Functions -----
-  const handleLoginSubmit = async (e: FormEvent) => {
+  const handleLoginSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    if (!validateLogin()) return;
+    setErrors({});
 
-    // If OTP hasn't been sent yet, send OTP based on identifier type.
+    if (!loginData.identifier) {
+      setErrors({ identifier: "Email or phone is required" });
+      return;
+    }
+
+    // If OTP hasn't been sent, send the OTP.
     if (!loginOtpSent) {
       try {
         if (loginData.identifier.includes("@")) {
           // Send OTP to email
-          const response = await axios.post(
-            "http://127.0.0.1:5000/user/login/sendEmailOTP",
-            {
-              email: loginData.identifier,
-            }
-          );
-          if (response.data.message) {
+          const response = await axios.post("http://127.0.0.1:5000/user/login/sendEmailOTP", {
+            email: loginData.identifier,
+          });
+          if (response.data.success) {
             setLoginOtpSent(true);
             Swal.fire({
               icon: "success",
               title: "OTP Sent",
-              text: "OTP has been sent to your email.",
+              text: response.data.message,
               timer: 1500,
               showConfirmButton: false,
             });
@@ -171,25 +185,22 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
             Swal.fire({
               icon: "error",
               title: "Error",
-              text: response.data.error || "Failed to send OTP.",
+              text: response.data.message || "Failed to send OTP.",
               timer: 1500,
               showConfirmButton: false,
             });
           }
         } else {
           // Send OTP to phone
-          const response = await axios.post(
-            "http://127.0.0.1:5000/user/login/sendOTP",
-            {
-              phone: loginData.identifier,
-            }
-          );
-          if (response.data.message === "OTP sent for login") {
+          const response = await axios.post("http://127.0.0.1:5000/user/login/sendOTP", {
+            phone: loginData.identifier,
+          });
+          if (response.data.success) {
             setLoginOtpSent(true);
             Swal.fire({
               icon: "success",
               title: "OTP Sent",
-              text: "OTP has been sent to your phone.",
+              text: response.data.message,
               timer: 1500,
               showConfirmButton: false,
             });
@@ -197,7 +208,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
             Swal.fire({
               icon: "error",
               title: "Error",
-              text: response.data.error || "Failed to send OTP.",
+              text: response.data.message || "Failed to send OTP.",
               timer: 1500,
               showConfirmButton: false,
             });
@@ -207,14 +218,14 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: error.response ? error.response.data.error : error.message,
+          text: error.response?.data?.message || error.message,
           timer: 1500,
           showConfirmButton: false,
         });
       }
       return;
     } else {
-      // If OTP has been sent, proceed with verification.
+      // If OTP is sent, verify it.
       if (!loginData.otp) {
         Swal.fire({
           icon: "error",
@@ -228,34 +239,29 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       try {
         let response;
         if (loginData.identifier.includes("@")) {
-          // Verify OTP for email login
-          response = await axios.post(
-            "http://127.0.0.1:5000/user/login/verifyEmailOTP",
-            {
-              email: loginData.identifier,
-              otp: loginData.otp,
-            }
-          );
+          // Verify email OTP
+          response = await axios.post("http://127.0.0.1:5000/user/login/verifyEmailOTP", {
+            email: loginData.identifier,
+            otp: loginData.otp,
+          });
         } else {
-          // Verify OTP for phone login
-          response = await axios.post(
-            "http://127.0.0.1:5000/user/login/verifyOTP",
-            {
-              phone: loginData.identifier,
-              otp: loginData.otp,
-            }
-          );
+          // Verify phone OTP
+          response = await axios.post("http://127.0.0.1:5000/user/login/verifyOTP", {
+            phone: loginData.identifier,
+            otp: loginData.otp,
+          });
         }
-        if (response.data.message === "Login OTP verified successfully") {
-          localStorage.setItem("user", JSON.stringify(response.data.user));
+        if (response.data.success) {
+          // Expect user data in response.data.data.user per centralized response.
+          localStorage.setItem("user", JSON.stringify(response.data.data.user));
           localStorage.setItem("isLoggedIn", "true");
           onClose();
-          router.refresh();
+          routerInstance.refresh();
         } else {
           Swal.fire({
             icon: "error",
             title: "Error",
-            text: response.data.msg,
+            text: response.data.message,
             timer: 1500,
             showConfirmButton: false,
           });
@@ -264,7 +270,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: error.response ? error.response.data.error : error.message,
+          text: error.response?.data?.message || error.message,
           timer: 1500,
           showConfirmButton: false,
         });
@@ -284,41 +290,19 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       });
       return;
     }
-    setShowEmailOtpInput(true);
-    setIsSendingEmailOtp(true);
+    // setShowEmailOtpInput(true);
+    // setIsSendingEmailOtp(true);
+    // Uncomment and update endpoint as needed:
     // try {
-    //   const response = await axios.post(
-    //     "http://127.0.0.1:5000/user/send_email_otp",
-    //     { email: signupData.email }
-    //   );
-    //   if (response.data.status === 200) {
-    //     Swal.fire({
-    //       icon: "success",
-    //       title: "OTP Sent",
-    //       text: "OTP has been sent to your email.",
-    //       timer: 1500,
-    //       showConfirmButton: false,
-    //     });
-    //     // Update the UI to show the OTP input field.
+    //   const response = await axios.post("http://127.0.0.1:5000/user/send_email_otp", { email: signupData.email });
+    //   if (response.data.success) {
+    //     Swal.fire({ icon: "success", title: "OTP Sent", text: response.data.message, timer: 1500, showConfirmButton: false });
     //     setShowEmailOtpInput(true);
-    //     setIsSendingEmailOtp(true);
     //   } else {
-    //     Swal.fire({
-    //       icon: "error",
-    //       title: "Error",
-    //       text: response.data.msg,
-    //       timer: 1500,
-    //       showConfirmButton: false,
-    //     });
+    //     Swal.fire({ icon: "error", title: "Error", text: response.data.message, timer: 1500, showConfirmButton: false });
     //   }
     // } catch (error: any) {
-    //   Swal.fire({
-    //     icon: "error",
-    //     title: "Error",
-    //     text: error.response ? error.response.data.msg : error.message,
-    //     timer: 1500,
-    //     showConfirmButton: false,
-    //   });
+    //   Swal.fire({ icon: "error", title: "Error", text: error.response?.data?.message || error.message, timer: 1500, showConfirmButton: false });
     // } finally {
     //   setIsSendingEmailOtp(false);
     // }
@@ -335,22 +319,19 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       });
       return;
     }
-    setIsVerifyingEmailOtp(true);
-    setEmailVerified(true);
+    // setIsVerifyingEmailOtp(true);
+    // setEmailVerified(true);
     // try {
-    //   const response = await axios.post(
-    //     "http://127.0.0.1:5000/user/verify_email_otp",
-    //     {
-    //       email: signupData.email,
-    //       otp: signupData.emailOtp,
-    //     }
-    //   );
-    //   if (response.data.status === 200) {
+    //   const response = await axios.post("http://127.0.0.1:5000/user/verify_email_otp", {
+    //     email: signupData.email,
+    //     otp: emailOtp,
+    //   });
+    //   if (response.data.success) {
     //     setEmailVerified(true);
     //     Swal.fire({
     //       icon: "success",
     //       title: "Verified",
-    //       text: "Email verified successfully.",
+    //       text: response.data.message,
     //       timer: 1500,
     //       showConfirmButton: false,
     //     });
@@ -358,7 +339,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
     //     Swal.fire({
     //       icon: "error",
     //       title: "Error",
-    //       text: response.data.msg,
+    //       text: response.data.message,
     //       timer: 1500,
     //       showConfirmButton: false,
     //     });
@@ -367,7 +348,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
     //   Swal.fire({
     //     icon: "error",
     //     title: "Error",
-    //     text: error.response ? error.response.data.msg : error.message,
+    //     text: error.response?.data?.message || error.message,
     //     timer: 1500,
     //     showConfirmButton: false,
     //   });
@@ -390,15 +371,12 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
     }
     setShowPhoneOtpInput(true);
     try {
-      const response = await axios.post(
-        "http://127.0.0.1:5000/user/sendOTP",
-        { phone: signupData.phone }
-      );
-      if (response.data.message === "OTP sent successfully") {
+      const response = await axios.post("http://127.0.0.1:5000/user/sendOTP", { phone: signupData.phone });
+      if (response.data.success) {
         Swal.fire({
           icon: "success",
           title: "OTP Sent",
-          text: "OTP has been sent to your phone.",
+          text: response.data.message,
           timer: 1500,
           showConfirmButton: false,
         });
@@ -406,7 +384,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: response.data.msg,
+          text: response.data.message,
           timer: 1500,
           showConfirmButton: false,
         });
@@ -415,9 +393,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: error.response
-          ? error.response.data.msg
-          : error.message,
+        text: error.response?.data?.message || error.message,
         timer: 1500,
         showConfirmButton: false,
       });
@@ -435,21 +411,17 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       });
       return;
     }
-    setPhoneVerified(true);
     try {
-      const response = await axios.post(
-        "http://127.0.0.1:5000/user/verifyOTP",
-        {
-          phone: signupData.phone,
-          otp: phoneOtp,
-        }
-      );
-      if (response.data.message === "Phone verified successfully") {
+      const response = await axios.post("http://127.0.0.1:5000/user/verifyOTP", {
+        phone: signupData.phone,
+        otp: phoneOtp,
+      });
+      if (response.data.success) {
         setPhoneVerified(true);
         Swal.fire({
           icon: "success",
           title: "Verified",
-          text: "Phone verified successfully.",
+          text: response.data.message,
           timer: 1500,
           showConfirmButton: false,
         });
@@ -457,7 +429,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: response.data.msg,
+          text: response.data.message,
           timer: 1500,
           showConfirmButton: false,
         });
@@ -466,9 +438,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: error.response
-          ? error.response.data.msg
-          : error.message,
+        text: error.response?.data?.message || error.message,
         timer: 1500,
         showConfirmButton: false,
       });
@@ -481,21 +451,19 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
     if (!validateSignup()) return;
 
     if (signupStep < 3) {
-      // Move to the next step if current step is validated
       setSignupStep((prev) => prev + 1);
     } else {
-      // Final step: submit registration
       try {
         const response = await axios.post(
           "http://127.0.0.1:5000/user/register",
           signupData,
           { headers: { "Content-Type": "application/json" } }
         );
-        if (response.data.message === "User registered successfully") {
+        if (response.data.success) {
           Swal.fire({
             icon: "success",
             title: "Success",
-            text: "Signup successful. Please log in.",
+            text: response.data.message,
             timer: 1500,
             showConfirmButton: false,
           }).then(() => {
@@ -517,7 +485,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
           Swal.fire({
             icon: "error",
             title: "Error",
-            text: response.data.msg,
+            text: response.data.message,
             timer: 1500,
             showConfirmButton: false,
           });
@@ -526,9 +494,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: error.response
-            ? error.response.data.msg
-            : error.message,
+          text: error.response?.data?.message || error.message,
           timer: 1500,
           showConfirmButton: false,
         });
@@ -536,14 +502,17 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
     }
   };
 
+  // ----- Additional Login (Dummy) Submission for Quick Login -----
   interface LoginSubmitResponse {
-    user: any; // Replace `any` with the actual user type if known
+    data: {
+      user: any;
+    };
   }
 
   interface LoginSubmitError {
     response?: {
       data?: {
-        error?: string;
+        message?: string;
       };
     };
   }
@@ -557,12 +526,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
       return;
     }
 
-    if (!loginOtpSent) {
-      // Simulate OTP being sent
-      setLoginOtpSent(true);
-      // You can also add a fake timer/notification if needed
-      return;
-    }
     try {
       const response = await axios.post<LoginSubmitResponse>(
         "http://127.0.0.1:5000/user/dummy",
@@ -571,22 +534,20 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
           phone: !loginData.identifier.includes("@") ? loginData.identifier : "",
         },
         {
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
         }
       );
-
-      // Handle success
-      console.log("Login Success:", response.data.user);
-      localStorage.setItem("user", JSON.stringify(response.data.user));
-      localStorage.setItem("isLoggedIn", "true");
-      onClose(); // Close the modal
-      // Redirect or save token etc. here
+      if (response.data && response.data.data) {
+        // With centralized response, user data is expected in response.data.data.user.
+        localStorage.setItem("user", JSON.stringify(response.data.data.user));
+        localStorage.setItem("isLoggedIn", "true");
+        onClose();
+        router.push("/"); // Redirect as required.
+      }
     } catch (error: unknown) {
       const err = error as LoginSubmitError;
       console.error(err);
-      const msg = err.response?.data?.error || "Login failed";
+      const msg = err.response?.data?.message || "Login failed";
       alert(msg);
     }
   };
@@ -655,19 +616,17 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                   <input
                     type="text"
                     name="identifier"
-                    placeholder="Enter email or phone Number"
+                    placeholder="Enter email or phone number"
                     value={loginData.identifier}
                     onChange={handleChange}
                     className="w-full border border-gray-300 rounded p-2 text-gray-600"
                   />
                   {errors.identifier && (
-                    <small className="text-red-600">
-                      {errors.identifier}
-                    </small>
+                    <small className="text-red-600">{errors.identifier}</small>
                   )}
                 </div>
 
-                {/* OTP Field (visible after OTP sent) */}
+                {/* OTP Field (visible after OTP is sent) */}
                 {loginOtpSent && (
                   <div className="mb-4">
                     <label className="block mb-1 text-black">
@@ -737,10 +696,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                           value={signupData.email}
                           onChange={handleChange}
                           disabled={showEmailOtpInput}
-                          className={`w-full border border-gray-300 rounded p-2 text-gray-600 ${showEmailOtpInput ? "pr-4 cursor-not-allowed" : "pr-32"
-                            }`}
+                          className={`w-full border border-gray-300 rounded p-2 text-gray-600 ${showEmailOtpInput ? "pr-4 cursor-not-allowed" : "pr-32"}`}
                         />
-                        {!showEmailOtpInput && (
+                        {/* {!showEmailOtpInput && (
                           <button
                             type="button"
                             onClick={handleSendEmailOtp}
@@ -748,12 +706,12 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                           >
                             Send OTP
                           </button>
-                        )}
+                        )} */}
                       </div>
                       {errors.email && (
                         <small className="text-red-600">{errors.email}</small>
                       )}
-                      {showEmailOtpInput && (
+                      {/* {showEmailOtpInput && (
                         <div className="mt-2 relative">
                           <input
                             type="text"
@@ -762,8 +720,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                             value={emailOtp}
                             onChange={(e) => setEmailOtp(e.target.value)}
                             disabled={emailVerified}
-                            className={`w-full border border-gray-300 rounded p-2 text-gray-600 ${emailVerified ? "pr-4 cursor-not-allowed" : "pr-32"
-                              }`}
+                            className={`w-full border border-gray-300 rounded p-2 text-gray-600 ${emailVerified ? "pr-4 cursor-not-allowed" : "pr-32"}`}
                           />
                           {!emailVerified ? (
                             <button
@@ -795,7 +752,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                             <small className="text-red-600">{errors.emailOtp}</small>
                           )}
                         </div>
-                      )}
+                      )} */}
                     </div>
                   </>
                 )}
@@ -807,9 +764,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                         Phone Number <span className="text-red-500">*</span>
                       </label>
                       <div className="flex border border-gray-300 rounded overflow-hidden">
-                        <span className="bg-gray-200 px-3 py-2 text-gray-600 flex items-center">
-                          +91
-                        </span>
+                        <span className="bg-gray-200 px-3 py-2 text-gray-600 flex items-center">+91</span>
                         <input
                           type="text"
                           name="phone"
@@ -817,15 +772,11 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                           value={signupData.phone}
                           onChange={(e) => {
                             const numericValue = e.target.value.replace(/\D/g, "");
-                            setSignupData((prev) => ({
-                              ...prev,
-                              phone: numericValue,
-                            }));
+                            setSignupData((prev) => ({ ...prev, phone: numericValue }));
                             setErrors((prev) => ({ ...prev, phone: "" }));
                           }}
                           disabled={showPhoneOtpInput}
-                          className={`flex-1 p-2 outline-none text-gray-600 ${showPhoneOtpInput ? "cursor-not-allowed" : ""
-                            }`}
+                          className={`flex-1 p-2 outline-none text-gray-600 ${showPhoneOtpInput ? "cursor-not-allowed" : ""}`}
                           maxLength={10}
                         />
                       </div>
@@ -833,15 +784,11 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                         <small className="text-red-600">{errors.phone}</small>
                       )}
                     </div>
-
-                    {/* Phone OTP Section */}
                     <div className="mt-2 relative">
                       {!showPhoneOtpInput && (
                         <button
                           type="button"
-                          onClick={() => {
-                            handleSendPhoneOtp();
-                          }}
+                          onClick={handleSendPhoneOtp}
                           className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded shadow transition"
                         >
                           Send Phone OTP
@@ -856,8 +803,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                             value={phoneOtp}
                             onChange={(e) => setPhoneOtp(e.target.value)}
                             disabled={phoneVerified}
-                            className={`w-full border border-gray-300 rounded p-2 text-gray-600 ${phoneVerified ? "pr-4 cursor-not-allowed" : "pr-32"
-                              }`}
+                            className={`w-full border border-gray-300 rounded p-2 text-gray-600 ${phoneVerified ? "pr-4 cursor-not-allowed" : "pr-32"}`}
                           />
                           {!phoneVerified ? (
                             <button
@@ -896,7 +842,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
 
                 {signupStep === 3 && (
                   <>
-                    {/* Date of Birth */}
                     <div className="mb-6">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Date of Birth <span className="text-red-500">*</span>
@@ -908,12 +853,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                         onChange={handleChange}
                         className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-green-600 focus:ring-2 focus:ring-green-600 transition duration-150 ease-in-out text-gray-700"
                       />
-                      {errors.dateOfBirth && (
+                      {errors.dob && (
                         <p className="mt-1 text-xs text-red-600">{errors.dob}</p>
                       )}
                     </div>
-
-                    {/* State Select */}
                     <div className="mb-6">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         State <span className="text-red-500">*</span>
@@ -923,7 +866,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                         onChange={(e: ChangeEvent<HTMLSelectElement>) => {
                           const selectedValue = e.target.value;
                           setSignupData((prev) => ({ ...prev, stateId: selectedValue, cityId: "" }));
-                          // Update city options for the selected state.
                           const selectedState = stateOptions.find((s) => s.value === selectedValue);
                           if (selectedState) {
                             setCityOptions(selectedState.cities);
@@ -944,9 +886,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                         <p className="mt-1 text-xs text-red-600">{errors.state}</p>
                       )}
                     </div>
-
-
-                    {/* City Select */}
                     <div className="mb-6">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         City <span className="text-red-500">*</span>
@@ -972,8 +911,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose }) => {
                         <p className="mt-1 text-xs text-red-600">{errors.city}</p>
                       )}
                     </div>
-
-
                     <div className="mb-6">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Referral Code

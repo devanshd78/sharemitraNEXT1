@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import Swal from "sweetalert2";
 
 interface TaskHistory {
   taskId: string;
   userId: string;
   matched_link: string;
-  task_name: string; // Updated to reflect task name instead of group name
+  task_name: string;
   participant_count: number;
   task_details: any;
   verified: boolean;
@@ -21,19 +22,25 @@ const TaskStatus: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Determines the status string and corresponding style classes
+  // Determines the status and corresponding styles.
   const getStatusInfo = (verified: boolean) => {
     if (verified) {
-      return { status: "Completed", style: "bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100" };
+      return {
+        status: "Completed",
+        style: "bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100"
+      };
     } else {
-      return { status: "Rejected", style: "bg-red-100 dark:bg-red-700 text-red-800 dark:text-red-100" };
+      return {
+        status: "Rejected",
+        style: "bg-red-100 dark:bg-red-700 text-red-800 dark:text-red-100"
+      };
     }
   };
 
   useEffect(() => {
     const fetchTaskHistory = async () => {
       try {
-        // Get the userId from local storage (adjust the key if necessary)
+        // Retrieve the userId from localStorage.
         const storedUser = localStorage.getItem("user");
         const user = storedUser ? JSON.parse(storedUser) : null;
         if (!user || !user.userId) {
@@ -45,17 +52,24 @@ const TaskStatus: React.FC = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId: user.userId }),
         });
+        const json = await response.json();
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch task history");
+        if (!response.ok || !json.success) {
+          throw new Error(json.message || "Failed to fetch task history");
         }
 
-        const json = await response.json();
-        // Expected response: { userId: string, task_history: TaskHistory[] }
-        setTasks(json.task_history);
-      } catch (error: any) {
-        console.error("Error fetching task history:", error);
-        setError(error.message || "An error occurred while fetching task history.");
+        // Use the centralized response payload.
+        setTasks(json.data.task_history || []);
+      } catch (err: any) {
+        console.error("Error fetching task history:", err);
+        setError(err.message || "An error occurred while fetching task history.");
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: err.message || "An error occurred while fetching task history.",
+          timer: 1500,
+          showConfirmButton: false,
+        });
       } finally {
         setLoading(false);
       }
@@ -72,7 +86,31 @@ const TaskStatus: React.FC = () => {
         </h2>
 
         {loading ? (
-          <p className="text-center text-gray-600 dark:text-gray-400">Loading tasks...</p>
+          <div className="flex flex-col items-center justify-center">
+            <div className="flex items-center justify-center p-4">
+              <svg
+                className="animate-spin h-6 w-6 text-green-600"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                ></path>
+              </svg>
+              <span className="ml-2 text-green-600 font-medium">Loading...</span>
+            </div>
+          </div>
         ) : error ? (
           <p className="text-center text-red-500">{error}</p>
         ) : tasks.length === 0 ? (
@@ -81,7 +119,9 @@ const TaskStatus: React.FC = () => {
             <p className="text-lg text-gray-700 dark:text-gray-300">
               You haven't completed any tasks yet!
             </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Start working on some tasks.</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Start working on some tasks.
+            </p>
           </div>
         ) : (
           <div className="w-full overflow-x-auto">
@@ -107,12 +147,25 @@ const TaskStatus: React.FC = () => {
                       transition={{ duration: 0.4, delay: index * 0.1 }}
                       className="bg-white dark:bg-zinc-800 border border-green-100 dark:border-green-700 rounded-lg shadow-sm hover:bg-green-50 dark:hover:bg-green-900 transition-colors"
                     >
-                      <td className="px-4 py-4 font-semibold text-gray-800 dark:text-gray-100">{index + 1}</td>
-                      <td className="px-4 py-4 text-gray-700 dark:text-gray-200">{task.task_name}</td>
-                      <td className="px-4 py-4 text-gray-700 dark:text-gray-200"> <a href={task.matched_link} target="_blank" rel="noopener noreferrer" className="underline text-blue-600 dark:text-blue-400 hover:text-blue-800">
-                        {task.matched_link} </a> 
+                      <td className="px-4 py-4 font-semibold text-gray-800 dark:text-gray-100">
+                        {index + 1}
                       </td>
-                      <td className="px-4 py-4 text-gray-700 dark:text-gray-200">{task.task_details.description}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-200">
+                        {task.task_name}
+                      </td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-200">
+                        <a
+                          href={task.matched_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline text-blue-600 dark:text-blue-400 hover:text-blue-800"
+                        >
+                          {task.matched_link}
+                        </a>
+                      </td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-200">
+                        {task.task_details.description}
+                      </td>
                       <td className="px-4 py-4">
                         <span className={`px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${style}`}>
                           {status}
