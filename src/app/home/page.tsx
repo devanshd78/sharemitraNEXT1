@@ -284,7 +284,7 @@ const HomePage: React.FC = () => {
       </section>
 
       {/* Tasks Section */}
-      <section id="task" className="max-w-6xl mx-auto px-6 py-20">
+      <section id="task" className="max-w-7xl mx-auto px-6 py-20">
         <h2 className="text-4xl font-bold mb-10 text-green-900 dark:text-green-100 text-center">
           Latest Task to Earn
         </h2>
@@ -330,7 +330,7 @@ const HomePage: React.FC = () => {
       </section>
 
       {/* How-to Section */}
-      <section id="how-to-do" className="w-full bg-white dark:bg-zinc-900 py-20 px-6">
+      <section id="how-to-Earn" className="w-full bg-white dark:bg-zinc-900 py-20 px-6">
         <h2 className="text-4xl font-bold mb-12 text-green-800 dark:text-green-100 text-center">
           How to Earn ?
         </h2>
